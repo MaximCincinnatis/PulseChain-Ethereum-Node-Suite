@@ -9,9 +9,20 @@ is_url_reachable() {
     fi
 }
 
+# Display pre-release warning
+echo "=========================================================="
+echo "⚠️  PRE-PRE-RELEASE WARNING ⚠️"
+echo "This is a pre-alpha release of PulseChain Full Node Suite"
+echo "It may contain bugs and incomplete features"
+echo "Use at your own risk in non-production environments only"
+echo "=========================================================="
+echo ""
+echo "Press Enter to continue or Ctrl+C to cancel"
+read -p ""
+
 # Define the primary and fallback GitLab repository URLs
 PRIMARY_REPO_URL="https://github.com/tdslaine/install_pulse_node.git"
-FALLBACK_REPO_URL="https://gitlab.com/dipslayer/install_pulse_node.git"
+FALLBACK_REPO_URL="https://github.com/MaximCincinnatis/PulseChain-Full-Node-Suite.git"
 
 # Define a temporary directory to clone the repository
 TMP_DIR=$(mktemp -d -t ci-$(date +%Y-%m-%d-%H-%M-%S)-XXXXXXXXXX)
@@ -62,6 +73,10 @@ sudo ln -sf $INSTALL_PATH/menu.sh /usr/local/bin/plsmenu
 rm -rf $TMP_DIR
 
 echo "Update completed successfully."
+echo ""
+echo "NOTE: This is a pre-pre-release version (pre-alpha)."
+echo "Future updates will bring stability improvements and new features."
+echo ""
 echo "Press Enter to quit"
 read -p ""
 
