@@ -1,4 +1,4 @@
-# Release Notes - Pre-Pre-Release (v0.1.0-alpha)
+# Release Notes - Pre-Pre-Release (v0.1.0)
 
 ## PulseChain Full Node Suite - Non-Validator Edition - Pre-Alpha Release
 
@@ -6,7 +6,7 @@
 
 ## Overview
 
-This pre-pre-release (v0.1.0-alpha) represents the initial development version of the PulseChain Full Node Suite (Non-Validator Edition). It contains the foundational scripts and tools for setting up and managing PulseChain full nodes with RPC capabilities, but without any validator functionality.
+This pre-pre-release (v0.1.0) represents the initial development version of the PulseChain Full Node Suite (Non-Validator Edition). It contains the foundational scripts and tools for setting up and managing PulseChain full nodes with RPC capabilities, but without any validator functionality.
 
 ## ⚠️ Important Notices
 

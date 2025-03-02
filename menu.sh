@@ -3,7 +3,7 @@
 # ===============================================================================
 # PulseChain Node Management Menu System
 # ===============================================================================
-# Version 2.0
+# Version 0.1.0
 # This menu system provides a user-friendly interface to manage a PulseChain node
 # ===============================================================================
 
@@ -20,7 +20,7 @@ else
     CONSENSUS_CONTAINER="consensus-client"
 fi
 
-VERSION="2.0"
+VERSION="0.1.0"
     
 # Handle Ctrl+C gracefully
 trap cleanup SIGINT

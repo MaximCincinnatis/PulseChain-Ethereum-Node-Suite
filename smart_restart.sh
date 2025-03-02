@@ -4,7 +4,7 @@
 # PulseChain Node Smart Restart Script
 # ===============================================================================
 # This script provides intelligent container management with visual feedback
-# Version: 1.0
+# Version: 0.1.0
 # ===============================================================================
 
 # Source global configuration

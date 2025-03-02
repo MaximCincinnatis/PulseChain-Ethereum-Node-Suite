@@ -4,7 +4,7 @@
 # PulseChain Node Health Check Script
 # ===============================================================================
 # This script performs health checks on the PulseChain node
-# Version: 1.1 (Enhanced with automatic disk protection)
+# Version: 0.1.0 (Enhanced with automatic disk protection)
 # ===============================================================================
 
 # Source global configuration

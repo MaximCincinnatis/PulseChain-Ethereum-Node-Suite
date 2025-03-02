@@ -1,5 +1,5 @@
 # PulseChain Node Setup Functions
-# v.1.1
+# v.0.1.0
 # Author: Maxim Broadcast
 # Modified: Validator functionality removed while keeping all other node functionality
 # This file contains all shared functions used by the PulseChain node setup scripts.
@@ -1435,6 +1435,8 @@ system_submenu() {
         sys_opt=$(dialog --stdout --title "System Menu $VERSION" --backtitle "PulseChain Node Setup by Maxim Broadcast" --menu "Choose an option:" 0 0 0 \
                         "Update Local Helper-Files" "Get latest additions/changes for plsmenu" \
                         "Add Graceful-Shutdown to System" "for system shutdown/reboot" \
+                        "Network Configuration" "Switch between local and public modes" \
+                        "VirtualBox Clipboard" "Manage clipboard sharing with host" \
                         "-" "" \
                         "Update & Reboot System" "" \
                         "Reboot System" "" \
@@ -1453,9 +1455,121 @@ system_submenu() {
                     ;;
                 "Add Graceful-Shutdown to System")
                     clear && script_launch "grace.sh"
+                    ;;
+                "Network Configuration")
+                    clear
+                    network_mode_submenu
                     ;;                    
+                "VirtualBox Clipboard")
+                    clear
+                    # Check if running in VirtualBox
+                    if ! dmesg | grep -i "virtualbox" > /dev/null; then
+                        echo -e "${RED}This system is not running in VirtualBox.${NC}"
+                        read -p "Press Enter to continue..."
+                        continue
+                    fi
+                    
+                    # Check if VBoxClient exists
+                    if ! command -v VBoxClient &> /dev/null; then
+                        echo -e "${RED}VirtualBox Guest Additions not installed.${NC}"
+                        echo "Please select 'Update System' menu option to install VirtualBox Guest Additions."
+                        read -p "Press Enter to continue..."
+                        continue
+                    fi
+                    
+                    while true; do
+                        clear
+                        echo -e "${GREEN}VirtualBox Clipboard Management${NC}"
+                        echo "=============================="
+                        echo ""
+                        
+                        # Check clipboard service status
+                        if systemctl is-active --quiet vboxclient-clipboard.service; then
+                            echo -e "Clipboard Service: ${GREEN}RUNNING${NC}"
+                        else
+                            echo -e "Clipboard Service: ${RED}NOT RUNNING${NC}"
+                        fi
+                        
+                        # Check clipboard process
+                        if pgrep -f "VBoxClient --clipboard" > /dev/null; then
+                            echo -e "Clipboard Process: ${GREEN}RUNNING${NC}"
+                        else
+                            echo -e "Clipboard Process: ${RED}NOT RUNNING${NC}"
+                        fi
+                        
+                        echo ""
+                        echo "1) Restart Clipboard Service"
+                        echo "2) Test Clipboard (copy test text)"
+                        echo "3) Install/Update Clipboard Service"
+                        echo "4) Back to System Menu"
+                        echo ""
+                        read -p "Enter your choice: " clipboard_choice
+                        
+                        case $clipboard_choice in
+                            1)
+                                echo "Restarting clipboard functionality..."
+                                # Stop existing processes
+                                pkill -f "VBoxClient --clipboard" || true
+                                
+                                # Restart service if it exists
+                                if [ -f /etc/systemd/system/vboxclient-clipboard.service ]; then
+                                    sudo systemctl restart vboxclient-clipboard.service
+                                    echo -e "${GREEN}Clipboard service restarted.${NC}"
+                                else
+                                    # Manual start as fallback
+                                    VBoxClient --clipboard
+                                    echo -e "${GREEN}Clipboard process started manually.${NC}"
+                                fi
+                                read -p "Press Enter to continue..."
+                                ;;
+                            2)
+                                echo -e "${YELLOW}Copying test text to clipboard...${NC}"
+                                echo "PulseChain Node Clipboard Test" | xclip -selection clipboard 2>/dev/null || true
+                                echo -e "${GREEN}Text 'PulseChain Node Clipboard Test' copied to clipboard.${NC}"
+                                echo "Please try pasting in your host system to verify clipboard is working."
+                                read -p "Press Enter to continue..."
+                                ;;
+                            3)
+                                echo "Creating/updating clipboard service..."
+                                
+                                # Create systemd service for clipboard sharing
+                                sudo tee /etc/systemd/system/vboxclient-clipboard.service > /dev/null << EOF
+[Unit]
+Description=VirtualBox Clipboard Service
+After=vboxadd.service
+ConditionVirtualization=oracle
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/VBoxClient --clipboard
+Restart=on-failure
+RestartSec=5
+User=$(whoami)
+
+[Install]
+WantedBy=multi-user.target
+EOF
+                                
+                                # Enable and restart the clipboard service
+                                sudo systemctl enable vboxclient-clipboard.service
+                                sudo systemctl restart vboxclient-clipboard.service
+                                
+                                echo -e "${GREEN}Clipboard service installed and started.${NC}"
+                                echo "You can now copy and paste between your host and virtual machine."
+                                read -p "Press Enter to continue..."
+                                ;;
+                            4)
+                                break
+                                ;;
+                            *)
+                                echo -e "${RED}Invalid option. Please try again.${NC}"
+                                read -p "Press Enter to continue..."
+                                ;;
+                        esac
+                    done
+                    ;;                
                 "-")
-                    ;;                    
+                    ;;
                 "Update & Reboot System")
                     clear
                     echo "Stopping running docker container..."
@@ -1516,6 +1630,107 @@ system_submenu() {
           1)
             break
             ;;
+        esac
+    done
+}
+
+# Network mode configuration submenu
+network_mode_submenu() {
+    while true; do
+        # Check current mode if set
+        local current_mode="Not set"
+        if [ -f "$CUSTOM_PATH/network_config/current_mode" ]; then
+            current_mode=$(cat "$CUSTOM_PATH/network_config/current_mode")
+            current_mode="${current_mode^}"  # Capitalize first letter
+        fi
+        
+        # Display the menu with current mode highlighted
+        network_opt=$(dialog --stdout --title "Network Configuration Menu $VERSION" \
+                     --backtitle "PulseChain Node Setup - Current Mode: $current_mode" \
+                     --menu "Choose a network configuration option:" 0 0 0 \
+                     "Switch to Local Mode" "Optimize for local machine and VM access" \
+                     "Switch to Public Mode" "Optimize for public RPC endpoint access" \
+                     "Show Current Settings" "Display active network configuration" \
+                     "Edit Local Config" "Customize local mode settings" \
+                     "Edit Public Config" "Customize public mode settings" \
+                     "Help" "Network configuration explanation" \
+                     "back" "Return to System Menu")
+
+        case $? in
+            0)
+                case $network_opt in
+                    "Switch to Local Mode")
+                        clear
+                        echo "Switching to Local Mode..."
+                        "$CUSTOM_PATH/helper/network_config.sh" local
+                        press_enter_to_continue
+                        ;;
+                    "Switch to Public Mode")
+                        clear
+                        echo "Switching to Public Mode..."
+                        "$CUSTOM_PATH/helper/network_config.sh" public
+                        press_enter_to_continue
+                        ;;
+                    "Show Current Settings")
+                        clear
+                        echo "Current Network Configuration:"
+                        "$CUSTOM_PATH/helper/network_config.sh" status
+                        press_enter_to_continue
+                        ;;
+                    "Edit Local Config")
+                        clear
+                        "$CUSTOM_PATH/helper/network_config.sh" edit-local
+                        clear
+                        echo "Local configuration has been updated."
+                        echo "You need to switch to local mode to apply these changes."
+                        press_enter_to_continue
+                        ;;
+                    "Edit Public Config")
+                        clear
+                        "$CUSTOM_PATH/helper/network_config.sh" edit-public
+                        clear
+                        echo "Public configuration has been updated."
+                        echo "You need to switch to public mode to apply these changes."
+                        press_enter_to_continue
+                        ;;
+                    "Help")
+                        clear
+                        cat << EOF
+======================================================
+PulseChain Node Network Configuration Help
+======================================================
+
+This tool allows you to optimize your network settings based on how you use your node:
+
+LOCAL MODE:
+- Optimized for high-throughput between your local machine and VMs
+- Perfect for personal use, development, and testing
+- Focuses on maximum data transfer performance
+- Default for most users
+
+PUBLIC MODE:
+- Optimized for handling many external connections
+- Ideal when exposing your node as a public RPC endpoint
+- Includes protection against connection floods
+- Better handles concurrent clients
+
+Current parameters can be viewed with "Show Current Settings"
+Custom configurations can be created by editing either mode.
+
+You should use LOCAL mode unless you specifically need to
+handle many external connections from different sources.
+======================================================
+EOF
+                        press_enter_to_continue
+                        ;;
+                    "back")
+                        break
+                        ;;
+                esac
+                ;;
+            1)
+                break
+                ;;
         esac
     done
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# PulseChain Monitoring Setup Script v1.1
+# PulseChain Monitoring Setup Script v0.1.0
 # This script sets up Prometheus and Grafana monitoring for a PulseChain node
 # Author: Maxim Broadcast
 

@@ -1,6 +1,6 @@
 # ⚠️ PRE-PRE-RELEASE WARNING ⚠️
 
-## PulseChain Full Node Suite - Non-Validator Edition - Alpha Development Version
+## PulseChain Full Node Suite - Non-Validator Edition - Alpha Development Version (v0.1.0)
 
 **THIS IS A PRE-PRE-RELEASE VERSION AND SHOULD BE CONSIDERED EXPERIMENTAL**
 

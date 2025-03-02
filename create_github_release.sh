@@ -4,7 +4,7 @@ echo "PulseChain Full Node Suite - GitHub Repository Setup"
 echo "==================================================="
 echo ""
 echo "This script will help you set up your GitHub repository and"
-echo "create a pre-pre-release version of your codebase."
+echo "create a pre-pre-release version (v0.1.0) of your codebase."
 echo ""
 echo "⚠️ Prerequisites:"
 echo "- A GitHub account"
@@ -16,6 +16,9 @@ echo ""
 CURRENT_DIR=$(pwd)
 REPO_NAME="PulseChain-Full-Node-Suite"
 GITHUB_USERNAME="MaximCincinnatis"
+
+# Set version information
+VERSION="0.1.0"
 
 echo "Step 1: Creating a backup of your codebase"
 echo "-----------------------------------------"
@@ -85,7 +88,7 @@ if command -v gh &> /dev/null; then
   echo "Step 5: Create a pre-release (requires GitHub CLI)"
   echo "----------------------------------------------"
   echo "To create a pre-release on GitHub, run:"
-  echo "cd backup_for_git && gh release create v0.1.0-alpha --prerelease --title 'Pre-Pre-Release v0.1.0-alpha' --notes-file RELEASE_NOTES.md"
+  echo "cd backup_for_git && gh release create v$VERSION --prerelease --title 'Pre-Pre-Release v$VERSION' --notes-file RELEASE_NOTES.md"
 else
   echo "Step 5: Create a pre-release (manual steps)"
   echo "--------------------------------------"
@@ -93,8 +96,8 @@ else
   echo "https://github.com/$GITHUB_USERNAME/$REPO_NAME/releases/new"
   echo ""
   echo "Create a new release with:"
-  echo "- Tag version: v0.1.0-alpha"
-  echo "- Release title: Pre-Pre-Release v0.1.0-alpha"
+  echo "- Tag version: v$VERSION"
+  echo "- Release title: Pre-Pre-Release v$VERSION"
   echo "- Description: Copy content from RELEASE_NOTES.md"
   echo "- Check 'This is a pre-release' box"
 fi

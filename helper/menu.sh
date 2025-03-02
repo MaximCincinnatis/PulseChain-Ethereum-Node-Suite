@@ -237,6 +237,7 @@ node_info_submenu() {
                          "Node Information" "⚙️ Check Node Status Information" \
                          "RPC Status" "⚙️ Check RPC Connection Status" \
                          "Sync Status" "⚙️ Check Sync Progress" \
+                         "Sync Recovery" "🛠️ Advanced Sync Troubleshooting & Recovery" \
                          "BACK" "⏱️ Return to the Main Menu")
 
         case $? in
@@ -272,6 +273,23 @@ node_info_submenu() {
                     ;;
                 "Sync Status")
                     clear && script_launch "check_sync.sh"
+                    ;;
+                "Sync Recovery")
+                    clear
+                    echo "Advanced Sync Recovery Tool"
+                    echo "--------------------------"
+                    echo "This tool provides enhanced diagnostics and recovery for blockchain sync issues."
+                    echo "It will:"
+                    echo " - Check for database corruption"
+                    echo " - Monitor sync progress"
+                    echo " - Safely restart clients if needed"
+                    echo " - Provide detailed logs of all actions"
+                    echo ""
+                    read -p "Press Enter to continue or Ctrl+C to cancel..." 
+                    clear && script_launch "sync_recovery.sh" --recover
+                    echo ""
+                    echo "Press any key to return to the menu..."
+                    read -n 1
                     ;;
                 "BACK")
                     break

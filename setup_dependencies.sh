@@ -5,6 +5,7 @@
 # ===============================================================================
 # This script installs and configures all dependencies required for a PulseChain node
 # Including system updates, required packages, and VirtualBox integration
+# Version: 0.1.0
 # ===============================================================================
 
 # Colors for better formatting
@@ -74,6 +75,7 @@ echo "2. Docker and Docker Compose"
 echo "3. VirtualBox Guest Additions (if running in VirtualBox)"
 echo "4. Time synchronization"
 echo "5. Performance optimizations"
+echo "6. Network optimizations"
 echo ""
 
 if ! confirm "Do you want to continue?"; then
@@ -210,64 +212,163 @@ if dmesg | grep -i "virtualbox" > /dev/null; then
     
     # Check if VBoxClient exists
     if command_exists VBoxClient; then
-        echo "VirtualBox Guest Additions is installed."
+        echo -e "${GREEN}VirtualBox Guest Additions is already installed.${NC}"
         
-        # Check clipboard status
-        if ! pgrep -f "VBoxClient --clipboard" > /dev/null; then
-            echo "VirtualBox clipboard sharing is not running."
-            if confirm "Start clipboard sharing?"; then
-                VBoxClient --clipboard
-                echo -e "${GREEN}Clipboard sharing started.${NC}"
-            fi
+        # Setup systemd service for clipboard if it doesn't exist
+        if [ ! -f /etc/systemd/system/vboxclient-clipboard.service ]; then
+            echo "Setting up persistent clipboard service..."
             
-            # Ask to set up clipboard sharing to start automatically
-            if confirm "Set up clipboard sharing to start automatically at login?"; then
-                # Create autostart file
-                mkdir -p ~/.config/autostart
-                cat > ~/.config/autostart/vbox-clipboard.desktop << EOF
-[Desktop Entry]
-Type=Application
-Exec=VBoxClient --clipboard
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-Name=VirtualBox Clipboard Sharing
-Comment=Enables clipboard sharing with the host OS
+            # Create systemd service for clipboard sharing
+            sudo tee /etc/systemd/system/vboxclient-clipboard.service > /dev/null << EOF
+[Unit]
+Description=VirtualBox Clipboard Service
+After=vboxadd.service
+ConditionVirtualization=oracle
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/VBoxClient --clipboard
+Restart=on-failure
+RestartSec=5
+User=$(whoami)
+
+[Install]
+WantedBy=multi-user.target
 EOF
-                echo -e "${GREEN}Clipboard sharing will now start automatically at login.${NC}"
-            fi
+            
+            # Enable and start the clipboard service
+            sudo systemctl enable vboxclient-clipboard.service
+            sudo systemctl start vboxclient-clipboard.service
+            
+            echo -e "${GREEN}Clipboard service installed and started.${NC}"
         else
-            echo -e "${GREEN}VirtualBox clipboard sharing is already running.${NC}"
+            # Check if clipboard service is active
+            if ! systemctl is-active --quiet vboxclient-clipboard.service; then
+                echo "Clipboard service exists but is not running."
+                sudo systemctl start vboxclient-clipboard.service
+                echo -e "${GREEN}Clipboard service started.${NC}"
+            else
+                echo -e "${GREEN}Clipboard service is already running.${NC}"
+            fi
         fi
+
+        # Also check if the VBoxClient clipboard process is running (as a backup)
+        if ! pgrep -f "VBoxClient --clipboard" > /dev/null; then
+            echo "Starting clipboard sharing now..."
+            VBoxClient --clipboard
+            echo -e "${GREEN}Clipboard sharing started.${NC}"
+        else
+            echo -e "${GREEN}VBoxClient clipboard process is already running.${NC}"
+        fi
+        
+        # Test clipboard functionality
+        echo -e "${YELLOW}Testing clipboard functionality...${NC}"
+        echo "test_clipboard_text" | xclip -selection clipboard 2>/dev/null || true
+        echo -e "${YELLOW}Try pasting in your host system to verify clipboard is working.${NC}"
+        
     else
         echo "VirtualBox Guest Additions not found."
-        if confirm "Install VirtualBox Guest Additions?"; then
+        if confirm "Automatically download and install VirtualBox Guest Additions?"; then
             # Install dependencies
-            sudo apt-get install -y dkms build-essential linux-headers-$(uname -r)
+            echo "Installing dependencies..."
+            sudo apt-get update
+            sudo apt-get install -y dkms build-essential linux-headers-$(uname -r) \
+                                   wget xclip bzip2 unzip
+
+            # Get VirtualBox version
+            echo "Detecting VirtualBox version..."
+            vbox_version=$(dmesg | grep -i "virtualbox" | head -n 1 | grep -o "BIOS.*" | cut -d' ' -f2)
             
-            # Mount VBoxGuestAdditions
-            echo "Please insert the VirtualBox Guest Additions CD image in VirtualBox"
-            echo "(Devices -> Insert Guest Additions CD image...)"
-            if confirm "Have you inserted the Guest Additions CD?"; then
-                # Try to mount the CD
-                sudo mkdir -p /mnt/cdrom
-                sudo mount /dev/cdrom /mnt/cdrom
-                
-                # Run the installer
-                cd /mnt/cdrom
-                sudo ./VBoxLinuxAdditions.run
-                
-                # Clean up
-                cd -
-                sudo umount /mnt/cdrom
-                
-                echo -e "${GREEN}VirtualBox Guest Additions installed. Please reboot your system.${NC}"
-                if confirm "Would you like to reboot now?"; then
-                    sudo reboot
-                fi
-            else
-                echo "Skipping Guest Additions installation."
+            if [ -z "$vbox_version" ]; then
+                # Alternative detection method
+                vbox_version=$(sudo dmidecode -t system | grep -i "virtualbox" | grep -o "Version.*" | cut -d' ' -f2 | cut -d'_' -f1)
             fi
+            
+            if [ -z "$vbox_version" ]; then
+                # If still can't detect, use latest version
+                echo "Could not detect VirtualBox version, using latest..."
+                vbox_version=$(wget -qO- https://download.virtualbox.org/virtualbox/LATEST.TXT)
+            fi
+            
+            echo "Detected VirtualBox version: $vbox_version"
+            
+            # Create temp directory
+            temp_dir=$(mktemp -d)
+            cd "$temp_dir"
+            
+            # Download Guest Additions ISO
+            echo "Downloading VirtualBox Guest Additions ISO..."
+            iso_url="https://download.virtualbox.org/virtualbox/$vbox_version/VBoxGuestAdditions_$vbox_version.iso"
+            wget "$iso_url" -O VBoxGuestAdditions.iso
+            
+            if [ ! -f VBoxGuestAdditions.iso ]; then
+                echo -e "${RED}Failed to download Guest Additions ISO.${NC}"
+                echo "Trying alternative download method with latest version..."
+                
+                # Get latest version
+                latest_version=$(wget -qO- https://download.virtualbox.org/virtualbox/LATEST.TXT)
+                iso_url="https://download.virtualbox.org/virtualbox/$latest_version/VBoxGuestAdditions_$latest_version.iso"
+                wget "$iso_url" -O VBoxGuestAdditions.iso
+                
+                if [ ! -f VBoxGuestAdditions.iso ]; then
+                    echo -e "${RED}Failed to download Guest Additions ISO with alternative method.${NC}"
+                    echo "Please try manual installation."
+                    cd
+                    rm -rf "$temp_dir"
+                    exit 1
+                fi
+            fi
+            
+            # Mount ISO
+            echo "Mounting Guest Additions ISO..."
+            mkdir -p iso
+            sudo mount -o loop VBoxGuestAdditions.iso iso
+            
+            # Install Guest Additions
+            echo "Installing Guest Additions..."
+            cd iso
+            sudo ./VBoxLinuxAdditions.run --nox11
+            cd ..
+            
+            # Cleanup
+            sudo umount iso
+            cd
+            rm -rf "$temp_dir"
+            
+            # Setup clipboard service
+            echo "Setting up persistent clipboard service..."
+            
+            # Create systemd service for clipboard sharing
+            sudo tee /etc/systemd/system/vboxclient-clipboard.service > /dev/null << EOF
+[Unit]
+Description=VirtualBox Clipboard Service
+After=vboxadd.service
+ConditionVirtualization=oracle
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/VBoxClient --clipboard
+Restart=on-failure
+RestartSec=5
+User=$(whoami)
+
+[Install]
+WantedBy=multi-user.target
+EOF
+            
+            # Enable and start the clipboard service
+            sudo systemctl enable vboxclient-clipboard.service
+            sudo systemctl start vboxclient-clipboard.service
+            
+            echo -e "${GREEN}VirtualBox Guest Additions installed successfully!${NC}"
+            echo -e "${GREEN}Clipboard service installed and started.${NC}"
+            echo -e "${YELLOW}Note: A system reboot is recommended for all features to work properly.${NC}"
+            
+            if confirm "Would you like to reboot now?"; then
+                sudo reboot
+            fi
+        else
+            echo "Skipping Guest Additions installation."
         fi
     fi
 else
@@ -315,58 +416,201 @@ if confirm "Synchronize time now?"; then
 fi
 
 # ===============================================================================
-# Performance Optimizations
+# Performance Optimization
 # ===============================================================================
-section "Performance Optimizations"
+section "Performance Optimization"
 
-# Adjust maximum file handles
-if confirm "Increase system file handle limits? (Recommended for nodes)"; then
-    if ! grep -q "fs.file-max" /etc/sysctl.conf; then
-        echo "fs.file-max = 500000" | sudo tee -a /etc/sysctl.conf
-    else
-        sudo sed -i 's/fs.file-max = .*/fs.file-max = 500000/' /etc/sysctl.conf
-    fi
-    
-    if ! grep -q "* soft nofile" /etc/security/limits.conf; then
-        echo "* soft nofile 65535" | sudo tee -a /etc/security/limits.conf
-        echo "* hard nofile 65535" | sudo tee -a /etc/security/limits.conf
-    fi
-    
-    sudo sysctl -p
-    echo -e "${GREEN}File handle limits increased.${NC}"
+echo "Setting up performance optimizations..."
+
+# Adjust file handle limits
+if grep -q "fs.file-max" /etc/sysctl.conf; then
+    echo "File handle limits already configured."
+else
+    echo "Configuring file handle limits..."
+    echo "fs.file-max = 500000" | sudo tee -a /etc/sysctl.conf
 fi
 
-# Adjust swappiness for better performance with large memory systems
-if confirm "Optimize memory swappiness settings? (Recommended)"; then
-    # Get total RAM in GB
-    TOTAL_RAM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
-    TOTAL_RAM_GB=$((TOTAL_RAM_KB / 1024 / 1024))
-    
-    # Set swappiness based on available RAM
-    if [[ $TOTAL_RAM_GB -ge 32 ]]; then
-        # Very low swappiness for high-RAM systems
-        SWAPPINESS=1
-    elif [[ $TOTAL_RAM_GB -ge 16 ]]; then
-        # Low swappiness for medium-high RAM
-        SWAPPINESS=10
-    elif [[ $TOTAL_RAM_GB -ge 8 ]]; then
-        # Moderate swappiness for medium RAM
-        SWAPPINESS=20
-    else
-        # Default for lower RAM systems
-        SWAPPINESS=60
-    fi
-    
-    # Update swappiness
-    if ! grep -q "vm.swappiness" /etc/sysctl.conf; then
-        echo "vm.swappiness = $SWAPPINESS" | sudo tee -a /etc/sysctl.conf
-    else
-        sudo sed -i "s/vm.swappiness = .*/vm.swappiness = $SWAPPINESS/" /etc/sysctl.conf
-    fi
-    
-    sudo sysctl -p
-    echo -e "${GREEN}Memory swappiness set to $SWAPPINESS.${NC}"
+# Configure swappiness based on available RAM
+total_ram=$(free -m | awk '/^Mem:/{print $2}')
+if [ $total_ram -gt 32000 ]; then
+    # For systems with >32GB RAM, disable swap
+    swappiness=0
+elif [ $total_ram -gt 16000 ]; then
+    # For systems with 16-32GB RAM, minimal swapping
+    swappiness=10
+else
+    # For systems with <16GB RAM, moderate swapping
+    swappiness=30
 fi
+
+echo "Setting swappiness to $swappiness based on $total_ram MB RAM..."
+if grep -q "vm.swappiness" /etc/sysctl.conf; then
+    sudo sed -i "s/vm.swappiness.*/vm.swappiness = $swappiness/" /etc/sysctl.conf
+else
+    echo "vm.swappiness = $swappiness" | sudo tee -a /etc/sysctl.conf
+fi
+
+# ===============================================================================
+# Network Optimization
+# ===============================================================================
+section "Network Optimization"
+
+echo "Setting up network optimizations..."
+
+# Create the network_config directory
+INSTALL_PATH=${INSTALL_PATH:-/blockchain}
+mkdir -p "$INSTALL_PATH/network_config"
+
+# Default to local mode for standard setups
+echo "Would you like to optimize network settings for:"
+echo "1) Local Mode (default) - For personal use and VM access"
+echo "2) Public Mode - For public RPC endpoints with many connections"
+read -p "Enter your choice [1/2] (default: 1): " network_mode
+network_mode=${network_mode:-1}
+
+if [ "$network_mode" == "1" ]; then
+    # Create local config (optimized for high-throughput local/VM access)
+    cat > "$INSTALL_PATH/network_config/local_network.conf" << EOF
+# PulseChain Node - Local/VM Mode Network Configuration
+# Optimized for high-throughput between local machine and VMs
+# Last updated: $(date)
+
+# Increase TCP buffer sizes for high throughput
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.ipv4.tcp_rmem = 4096 87380 16777216
+net.ipv4.tcp_wmem = 4096 65536 16777216
+
+# Increase the maximum connections
+net.core.somaxconn = 1024
+
+# Improve handling of busy connections
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_fastopen = 3
+
+# Optimize for throughput rather than latency
+net.ipv4.tcp_congestion_control = cubic
+EOF
+    
+    # Apply local settings
+    sudo cp "$INSTALL_PATH/network_config/local_network.conf" /etc/sysctl.d/99-pulsechain-network.conf
+    sudo sysctl -p /etc/sysctl.d/99-pulsechain-network.conf
+    
+    # Create symlink to active config
+    ln -sf "$INSTALL_PATH/network_config/local_network.conf" "$INSTALL_PATH/network_config/active_network.conf"
+    
+    # Set current mode indicator
+    echo "local" > "$INSTALL_PATH/network_config/current_mode"
+    
+    echo -e "${GREEN}Network optimized for local/VM usage.${NC}"
+    
+elif [ "$network_mode" == "2" ]; then
+    # Create public config (optimized for many external connections)
+    cat > "$INSTALL_PATH/network_config/public_network.conf" << EOF
+# PulseChain Node - Public Mode Network Configuration
+# Optimized for handling many external connections (public RPC endpoint)
+# Last updated: $(date)
+
+# Increase TCP buffer sizes for high throughput
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.ipv4.tcp_rmem = 4096 87380 16777216
+net.ipv4.tcp_wmem = 4096 65536 16777216
+
+# Optimize for many simultaneous connections
+net.core.somaxconn = 4096
+net.core.netdev_max_backlog = 5000
+net.ipv4.tcp_max_syn_backlog = 8096
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 30
+net.ipv4.ip_local_port_range = 1024 65535
+
+# Improve handling of busy connections
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_fastopen = 3
+
+# Congestion control for busy networks
+net.ipv4.tcp_congestion_control = cubic
+
+# Connection protection
+net.ipv4.tcp_synack_retries = 2
+net.ipv4.tcp_syncookies = 1
+EOF
+    
+    # Apply public settings
+    sudo cp "$INSTALL_PATH/network_config/public_network.conf" /etc/sysctl.d/99-pulsechain-network.conf
+    sudo sysctl -p /etc/sysctl.d/99-pulsechain-network.conf
+    
+    # Create symlink to active config
+    ln -sf "$INSTALL_PATH/network_config/public_network.conf" "$INSTALL_PATH/network_config/active_network.conf"
+    
+    # Set current mode indicator
+    echo "public" > "$INSTALL_PATH/network_config/current_mode"
+    
+    echo -e "${GREEN}Network optimized for public RPC endpoint usage.${NC}"
+fi
+
+# Also create the opposite config for future switching
+if [ "$network_mode" == "1" ]; then
+    # Create public config for future use
+    cat > "$INSTALL_PATH/network_config/public_network.conf" << EOF
+# PulseChain Node - Public Mode Network Configuration
+# Optimized for handling many external connections (public RPC endpoint)
+# Last updated: $(date)
+
+# Increase TCP buffer sizes for high throughput
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.ipv4.tcp_rmem = 4096 87380 16777216
+net.ipv4.tcp_wmem = 4096 65536 16777216
+
+# Optimize for many simultaneous connections
+net.core.somaxconn = 4096
+net.core.netdev_max_backlog = 5000
+net.ipv4.tcp_max_syn_backlog = 8096
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 30
+net.ipv4.ip_local_port_range = 1024 65535
+
+# Improve handling of busy connections
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_fastopen = 3
+
+# Congestion control for busy networks
+net.ipv4.tcp_congestion_control = cubic
+
+# Connection protection
+net.ipv4.tcp_synack_retries = 2
+net.ipv4.tcp_syncookies = 1
+EOF
+elif [ "$network_mode" == "2" ]; then
+    # Create local config for future use
+    cat > "$INSTALL_PATH/network_config/local_network.conf" << EOF
+# PulseChain Node - Local/VM Mode Network Configuration
+# Optimized for high-throughput between local machine and VMs
+# Last updated: $(date)
+
+# Increase TCP buffer sizes for high throughput
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.ipv4.tcp_rmem = 4096 87380 16777216
+net.ipv4.tcp_wmem = 4096 65536 16777216
+
+# Increase the maximum connections
+net.core.somaxconn = 1024
+
+# Improve handling of busy connections
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_fastopen = 3
+
+# Optimize for throughput rather than latency
+net.ipv4.tcp_congestion_control = cubic
+EOF
+fi
+
+echo -e "${YELLOW}Note: You can switch between network modes anytime using the menu system.${NC}"
+echo -e "${YELLOW}Run: plsmenu -> System Menu -> Network Configuration${NC}"
+echo -e "${GREEN}Network optimization complete!${NC}"
 
 # ===============================================================================
 # Completion
@@ -384,6 +628,7 @@ if dmesg | grep -i "virtualbox" > /dev/null; then
 fi
 echo "✓ Time synchronization set up"
 echo "✓ Performance optimizations applied"
+echo "✓ Network optimizations applied"
 echo ""
 echo "Your system is now ready to run a PulseChain node!"
 echo ""

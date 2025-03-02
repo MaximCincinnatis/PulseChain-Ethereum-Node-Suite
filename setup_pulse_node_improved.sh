@@ -3,7 +3,7 @@
 # ===============================================================================
 # PulseChain Node Setup Script (Improved Version)
 # ===============================================================================
-# v.1.2
+# v.0.1.0
 # Author: Maxim Broadcast
 # Modified: Validator functionality removed while keeping all other node functionality
 # Further improved with global configuration and dependency management

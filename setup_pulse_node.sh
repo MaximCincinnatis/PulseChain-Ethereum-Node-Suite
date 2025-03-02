@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# v.1.1
+# v.0.1.0
 # PulseChain Node Setup Script
 # Author: Maxim Broadcast
 # Modified: Validator functionality removed while keeping all other node functionality
@@ -74,7 +74,7 @@ log_info "Docker compatibility check passed"
 
 # Log basic system information
 log_info "Starting PulseChain Node Setup"
-log_info "Script version: 1.1"
+log_info "Script version: 0.1.0"
 log_info "Running as user: $(whoami)"
 log_info "System: $(uname -a)"
 

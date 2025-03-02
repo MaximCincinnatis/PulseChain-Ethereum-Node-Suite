@@ -1,4 +1,4 @@
-# PulseChain Node Setup (Non-Validator Version)
+# PulseChain Node Setup (Non-Validator Version v0.1.0)
 
 This is a modified version of the PulseChain Node Setup scripts with all validator functionality removed. This version allows you to run a PulseChain node for syncing with the network, providing RPC endpoints, and monitoring the blockchain, but does not include any validator staking capabilities.
 
