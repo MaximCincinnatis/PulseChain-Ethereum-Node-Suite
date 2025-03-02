@@ -1,4 +1,108 @@
-   
+# PulseChain Node Setup - Non-Validator Version
+
+This is a comprehensive set of scripts for setting up and managing a PulseChain node without validator functionality.
+
+## Overview
+
+This package provides an automated, user-friendly system for deploying and managing a PulseChain node. It's specifically designed for users who want to run a regular PulseChain node without validator functionality. All validator-related features have been removed for simplicity and focus.
+
+## What This Package Does
+
+This collection of scripts automates the following processes:
+
+1. **System Preparation**: Installs and configures all required dependencies including Docker, system packages, and performance optimizations.
+
+2. **Node Deployment**: Sets up both execution client (Geth/Erigon) and consensus client (Lighthouse/Prysm) as Docker containers.
+
+3. **Configuration Management**: Manages node configuration through a centralized system with proper defaults and persistence.
+
+4. **Monitoring Solution**: Deploys Prometheus and Grafana for comprehensive node performance monitoring and alerting.
+
+5. **Health Management**: Continuously checks node health with automatic protection mechanisms for disk space, CPU, and memory issues.
+
+6. **Failure Recovery**: Implements smart restart functionality to handle crashes and ensure high availability.
+
+7. **User Interface**: Provides an intuitive menu system for all node management operations.
+
+## What's Been Modified
+
+1. Removed all validator setup functionality
+2. Updated menu options to remove validator-related choices
+3. Added clear notification that this is a non-validator version
+4. Filtered out validator-related helper scripts during installation
+5. Simplified user experience for regular node operators
+
+## Technical Components
+
+The system consists of several key scripts:
+
+- `setup_pulse_node.sh`: Main installation script that orchestrates the entire setup process
+- `functions.sh`: Core shared functions used by all scripts
+- `config.sh`: Central configuration management
+- `menu.sh`: Interactive management interface
+- `setup_monitoring.sh`: Deploys Prometheus/Grafana monitoring stack
+- `health_check.sh`: Performs regular system health verification
+- `smart_restart.sh`: Handles graceful container restarts and crash recovery
+- `setup_dependencies.sh`: Manages system dependencies and optimizations
+
+## Reliability Features
+
+This package includes several reliability mechanisms:
+
+1. **Disk Protection**: Automatically stops nodes when disk space reaches critical levels to prevent data corruption
+2. **Comprehensive Logging**: Detailed logs for all operations with timestamps and severity levels
+3. **Error Handling**: Robust error trapping with descriptive messages and stack traces
+4. **Container Management**: Graceful shutdown with appropriate timeouts for data integrity
+5. **Configuration Persistence**: Saves all settings in JSON format for reliable operation
+
+## Installation
+
+Simply transfer these files to the target machine and run the setup script:
+
+```bash
+chmod +x setup_pulse_node.sh
+./setup_pulse_node.sh
+```
+
+Follow the prompts to complete the installation.
+
+## Important Notice
+
+**This is a NON-VALIDATOR version. You CANNOT use this version for validation or staking.**
+
+If you need validator functionality, please use the original unmodified version of these scripts from the official PulseChain repositories.
+
+## System Requirements
+
+- Ubuntu 20.04 LTS or newer
+- At least 16GB RAM (32GB recommended for optimal performance)
+- At least a 2TB SSD (NVMe SSD recommended for best performance)
+- Stable internet connection with at least 10Mbps upload/download
+- Modern CPU with at least 4 cores
+
+## Features Included
+
+- Full node setup (execution and consensus clients)
+- Monitoring dashboard with performance metrics
+- Helper scripts for node management
+- Menu system for easy operation
+- Docker-based deployment for simplicity
+- Automatic health checks and protection mechanisms
+- Graceful container management
+- Comprehensive logging and error reporting
+
+## Features Removed
+
+- Validator setup and key management
+- Validator status monitoring
+- Validator exit functionality
+- BLS to execution address conversion
+- Sync committee monitoring
+
+## License
+
+This software is licensed under the same terms as the original PulseChain node setup scripts.
+
 <img src="https://github-production-user-asset-6210df.s3.amazonaws.com/46573429/238115944-7791dc23-8150-459b-b07e-28a4c05345f6.png" style="max-width: 100%; margin: 0 auto;"/>
 </div>
 
@@ -6,35 +110,36 @@
 ## AIO Interactive Setup
 Pulse-Chain Unleashed: Experience the Harmony of Effortless Innovation and Peace of Mind with this interactive setup script 
 
-####  Donations: Donations are appreciated and will help. Thank you for your support!
-
-(PRC20) : `0xCB00d822323B6f38d13A1f951d7e31D9dfDED4AA`
-
 ### Info: Current plsmenu version: 1.5  (updated 12-13-2024)
 
 
-## Installing and Running a Pulsechain Node/Validator + Prometheus/Grafana Monitoring
+## Installing and Running a Pulsechain Node + Prometheus/Grafana Monitoring
 
-<small>This setup is split into three parts to provide greater flexibility for users based on their needs.
+<small>This setup is split into two parts to provide greater flexibility for users based on their needs.
 
-The first part is the node setup, which involves setting up the core node infrastructure. This includes installing necessary packages and dependencies to run a node. (`setup_pulse_node.sh`)
+The first part is the node setup, which involves setting up the core node infrastructure. This includes:
+- Installing required system packages
+- Setting up Docker and optimization parameters
+- Deploying execution client (blockchain data)
+- Deploying consensus client (block validation)
+- Configuring networking and security
 
-The second part is the validator setup, which involves configuring the node as a validator, setting up validators keys,wallets, and importing those. (`setup_validator.sh`)
+The second part is the monitoring setup, which involves:
+- Setting up Prometheus for metrics collection
+- Deploying Grafana for visual dashboards
+- Configuring alerting mechanisms
+- Setting up system resource monitoring
 
-The third part is the monitoring setup, which involves setting up Prometheus/Grafana to keep track of the node and its performance via webinterface. (`setup_monitoring.sh`)
-
-You can run each step individually, based on your requirements, by calling the appropriate setup_###.sh script. This provides a convenient way to install and configure only the necessary components.
-
-Additionally, it's worth noting that after completing each installation step, you'll be prompted to continue with the next setup. This means that there's no need to run each script separately, as the setup process will guide you through each step in sequence.
+You can run each step individually by calling the appropriate setup_###.sh script, or follow the guided process where each successful step will prompt you to continue to the next one.
    
-To prepare dedicated devices for offline-key generation use (`setup_offline_keygen.sh`), this will work on a linux live iso and devices which are meant to stay offline after the initial keygen setup.
-
-This streamlined approach ensures that you have a smooth and hassle-free setup experience, and can get up and running quickly. </small>
+This approach ensures you have complete flexibility while maintaining a smooth setup experience.</small>
 
 
 ## |#| Prerequisites
 
-- A Unix-based operating system (e.g., Ubuntu)
+- A Unix-based operating system (Ubuntu 20.04 LTS or newer recommended)
+- Root or sudo access
+- Internet connection for downloading packages and blockchain data
 
 ## |#| Installation Steps
 
@@ -43,14 +148,6 @@ This streamlined approach ensures that you have a smooth and hassle-free setup e
 Whole Setup:
 ```bash
 sudo apt update && sudo apt install git -y && git clone https://github.com/tdslaine/install_pulse_node && cd install_pulse_node && chmod +x setup_pulse_node.sh && ./setup_pulse_node.sh
-```
-Offline-Keygen only:
-```bash
-sudo apt update && sudo apt install git -y && git clone https://github.com/tdslaine/install_pulse_node && cd install_pulse_node && chmod +x setup_offline_keygen.sh && ./setup_offline_keygen.sh
-```
-or
-```bash
-wget https://tinyurl/valikey -O setup_offline_keygen.sh && chmod +x setup_offline_keygen.sh && ./setup_offline_keygen.sh
 ```
 
 ### Manual Steps
@@ -95,10 +192,8 @@ cd into the folder you provided in the setup (default: `/blockchain`):
 
 ```bash
 cd /blockchain \
-
 ./start_execution.sh \
-./start_consensus.sh \
-./start_validator.sh 
+./start_consensus.sh
 ```
 
 #### 7. Make sure your docker-images are running:

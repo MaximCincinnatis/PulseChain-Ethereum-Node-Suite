@@ -1,25 +1,85 @@
 #!/bin/bash
 
 # v.1.1
+# PulseChain Node Setup Script
+# Author: Maxim Broadcast
+# Modified: Validator functionality removed while keeping all other node functionality
 
-#Icosa, Hex, Hedron,
-#Three shapes in symmetry dance,
-#Nature's art is shown.
+# This script automates the installation and configuration of a PulseChain node.
+# It handles dependencies, directory setup, Docker configuration, and network selection.
+# The script is designed to be user-friendly with appropriate prompts and validations.
 
-# By tdslaine aka Peter L Dipslayer  TG: @dipslayer369  Twitter: @dipslayer
-
-
+# Define color codes for better readability
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
+# Exit script on error
+set -e
+
+# Set up error handling
+trap 'handle_error $? ${LINENO} "${BASH_COMMAND}"' ERR
+
+# Error handling function
+handle_error() {
+  local exit_code=$1
+  local line_number=$2
+  local command="$3"
+  
+  log_error "An error occurred at line ${BASH_LINENO[0]} (exit code: $exit_code)"
+  log_error "Command that failed: ${BASH_COMMAND}"
+  
+  # Display stack trace
+  local i=0
+  local stack_size=${#FUNCNAME[@]}
+  log_debug "Stack trace:"
+  while [ $i -lt $stack_size ]; do
+    log_debug "  $i: ${BASH_SOURCE[$i]}:${BASH_LINENO[$i]} ${FUNCNAME[$i]}"
+    i=$((i+1))
+  done
+  
+  echo -e "${RED}Setup failed!${NC}"
+  echo "Please check the log file for details: $LOG_FILE"
+  echo "You can report this issue with the log file attached."
+  
+  exit 1
+}
+
+# Store initial directory to return later if needed
 start_dir=$(pwd)
 script_dir=$(dirname "$0")
 
+# Import helper functions
+if [ ! -f "$script_dir/functions.sh" ]; then
+  echo -e "${RED}Error: Required functions.sh file not found!${NC}"
+  exit 1
+fi
 source "$script_dir/functions.sh"
 
+# Initialize logging
+init_logging
+
+# Check Docker version early in the process
+log_info "Checking Docker compatibility..."
+if ! check_docker_version; then
+    log_error "Docker compatibility check failed"
+    echo -e "${RED}Error: Docker compatibility check failed. This setup requires Docker 20.10 or newer.${NC}"
+    echo "Please install or upgrade Docker and try again."
+    echo "For detailed instructions, visit: https://docs.docker.com/engine/install/"
+    echo "For more details about the error, see the log file: $LOG_FILE"
+    exit 1
+fi
+log_info "Docker compatibility check passed"
+
+# Log basic system information
+log_info "Starting PulseChain Node Setup"
+log_info "Script version: 1.1"
+log_info "Running as user: $(whoami)"
+log_info "System: $(uname -a)"
+
 clear
-echo "     Pulse Node/Validator/Monitoring Setup by Dipslayer"
+echo "     Pulse Node/Monitoring Setup"
 echo "                                                                                                                                                    
                    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                          
                  ▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                         
@@ -37,25 +97,44 @@ echo "
         ▓▓▓▓▓▓▓▓▓▓▓▓▓▓     ▓▓▓▓▓  ▓▓   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓               
          ░▓▓▓▓▓▓▓▓▓▓▓▓▓▒  ▓▓▓▓▓▓  ▓▒  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                 
            ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓      ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                  
+            ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                      
             ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                   
              ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                    
               ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                     
                ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                      
                 ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                        
-                 ▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                         
+                 ▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                      
                    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                                                                                                   
                                                                              "
-                                                         
-echo "donations: 0xCB00d822323B6f38d13A1f951d7e31D9dfDED4AA "                   
+                                                             
 echo "Please press Enter to continue..."
 read -p ""
-clear                                                                                                                                                                                                                          
+clear
+
+echo -e "\033[1;33m"
+echo "┌─────────────────────────────────────────────────────────┐"
+echo "│              NON-VALIDATOR VERSION NOTICE               │"
+echo "├─────────────────────────────────────────────────────────┤"
+echo "│ This is a modified version of the PulseChain setup      │"
+echo "│ script with all validator functionality removed.        │"
+echo "│                                                         │"
+echo "│ You CANNOT use this version for validation or staking.  │"
+echo "│ This version only supports running a regular node.      │"
+echo "│                                                         │"
+echo "│ If you need validator functionality, please use the     │"
+echo "│ original unmodified version of these scripts.           │"
+echo "└─────────────────────────────────────────────────────────┘"
+echo -e "\033[0m"
+echo ""
+press_enter_to_continue
+clear
+
 echo -e "\033[1;33m"
 echo "┌─────────────────────────────────────────────────────────┐"
 echo "│ DISCLAIMER! Please read the following carefully!        │"
 echo "├─────────────────────────────────────────────────────────┤"
 echo "│ This script automates the installation and setup        │"
-echo "│ process for a PulseChain Node/Validator.                │"
+echo "│ process for a PulseChain Node.                          │"
 echo "│                                                         │"
 echo "│ By using this script, you acknowledge that you          |"
 echo "| understand the potential risks involved and accept      │"
@@ -67,35 +146,79 @@ echo "│ and understand its workings before proceeding.          │"
 echo "└─────────────────────────────────────────────────────────┘"
 echo -e "\033[0m"
 
+# After the disclaimer and before installing packages
+# Check prerequisites for the installation
+log_info "Running pre-installation checks"
+
+# Test network connectivity before proceeding
+echo -e "${GREEN}Checking network connectivity requirements...${NC}"
+if ! test_network_connectivity; then
+    log_error "Network connectivity check failed"
+    echo -e "${RED}Error: Network connectivity check failed. This setup requires internet access.${NC}"
+    echo "Please check your network connection and try again."
+    echo "For more details, see the log file: $LOG_FILE"
+    exit 1
+fi
+echo -e "${GREEN}Network connectivity check passed${NC}"
+
+# Now continue with the installation
+
+# Add this after the clients have been started and before the final verification
+
+# After both clients have been set up but before the final message
+log_info "Initial node setup complete, starting verification..."
+
+echo -e "${GREEN}Starting node verification process...${NC}"
+echo "This may take a minute. We'll check that everything is working correctly."
+
+# Allow a moment for containers to fully start
+sleep 10
+
+# Check if the containers started
+echo "Checking if containers are running..."
+if ! docker ps | grep -q "execution"; then
+    log_error "Execution client container failed to start"
+    echo -e "${RED}Error: Execution client (${ETH_CLIENT}) container is not running.${NC}"
+    echo "Try starting it manually: sudo $CUSTOM_PATH/start_execution.sh"
+else
+    log_info "Execution client container is running"
+    echo -e "${GREEN}Execution client container is running.${NC}"
+fi
+
+if ! docker ps | grep -q "beacon"; then
+    log_error "Consensus client container failed to start"
+    echo -e "${RED}Error: Consensus client (${CONSENSUS_CLIENT}) container is not running.${NC}"
+    echo "Try starting it manually: sudo $CUSTOM_PATH/start_consensus.sh"
+else
+    log_info "Consensus client container is running"
+    echo -e "${GREEN}Consensus client container is running.${NC}"
+fi
+
+# Make the verify_node.sh script executable
+if [ -f "$CUSTOM_PATH/helper/verify_node.sh" ]; then
+    sudo chmod +x $CUSTOM_PATH/helper/verify_node.sh
+    sudo chown $main_user:docker $CUSTOM_PATH/helper/verify_node.sh
+    log_info "Verification script prepared: $CUSTOM_PATH/helper/verify_node.sh"
+fi
+
+echo ""
+echo -e "${GREEN}You can run a detailed node verification at any time with:${NC}"
+echo "$CUSTOM_PATH/helper/verify_node.sh"
+
+# Confirm user wishes to proceed
 read -p "Do you wish to continue? (y/n): " CONFIRM
 if [[ "$CONFIRM" != "y" && "$CONFIRM" != "Y" ]]; then
   echo "Aborting."
   exit 1
 fi
+
+# Clear screen and continue with setup
 clear
-echo -e "\033[1;33m"
-echo -e "+============================================+"
-echo -e "|                ☆ Shoutouts ☆               |"
-echo -e "+============================================+"
-echo -e "| Sincere thanks to @rainbowtopgun for his   |"
-echo -e "| invaluable feedback & steadfast support    |"
-echo -e "| during the development of these scripts.   |"
-echo -e "|                                            |"
-echo -e "| Special thanks to raskitoma for forking    |"
-echo -e "| the Yoldark_ETH_staking_dashboard. GitHub: |"
-echo -e "| https://github.com/raskitoma/pulse-        |"
-echo -e "| staking-dashboard                          |"
-echo -e "|                                            |"
-echo -e "| Gratitude to the Pulse-dev Telegram for    |"
-echo -e "| their valuable info & collective wisdom.   |"
-echo -e "|                                            |"
-echo -e "| Big thanks to all who contributed with     |"
-echo -e "| constructive feedback to improve my work!  |"
-echo -e "+--------------------------------------------+"
-echo -e "\033[0m"
 
 press_enter_to_continue
 clear
+
+# Continue with the rest of the script
 echo "+=================+"
 echo "| Choose Network: |"
 echo "+=================+"
@@ -118,8 +241,6 @@ case $choice in
     exit 1
     ;;
 esac
-
-
 
 #enabling ntp for timesyncronization
 clear
@@ -256,10 +377,23 @@ registry.gitlab.com/pulsechaincom/erigon-pulse:latest \\
 --authrpc.jwtsecret=/blockchain/jwt.hex \\
 --datadir=/blockchain/execution/erigon \\
 --http \\
---http.api="eth,erigon,web3,net,debug,trace,txpool" \\
+--http.addr=0.0.0.0 \\
+--http.vhosts=* \\
+--http.corsdomain=* \\
+--http.api="eth,erigon,web3,net,debug,trace,txpool,admin" \\
+--ws \\
+--ws.addr=0.0.0.0 \\
+--ws.origins=* \\
+--ws.api="eth,erigon,web3,net,debug,trace,txpool,admin" \\
 --metrics \\
+--metrics.addr=0.0.0.0 \\
 --pprof \\
---externalcl "
+--externalcl \\
+--maxpeers 200 \\
+--cache 48000 \\
+--db.size.limit 6TB \\
+--torrent.download.rate 450000 \\
+--state.scheme=path"
 
 ERIGON_CMD2="sudo -u erigon docker run -dt --restart=always  \\
 --network=host \\
@@ -448,6 +582,17 @@ if [[ $rpc_choice == "y" ]]; then
   if [[ $local_network_choice == "y" ]]; then
     sudo ufw allow from $ip_range to any port 8545 proto tcp comment 'RPC Port for private IP range'
   fi
+  
+  # Add option for remote AI indexing machine
+  read -p "Do you want to allow a specific remote machine to access the RPC for AI indexing? (y/N): " ai_indexing_choice
+  if [[ $ai_indexing_choice == "y" ]]; then
+    read -p "Enter the IP address of the AI indexing machine: " ai_machine_ip
+    if [[ -n "$ai_machine_ip" ]]; then
+      sudo ufw allow from $ai_machine_ip to any port 8545 proto tcp comment 'RPC Port for AI indexing machine'
+      sudo ufw allow from $ai_machine_ip to any port 8546 proto tcp comment 'WebSocket Port for AI indexing machine'
+      echo "Allowed RPC and WebSocket access from $ai_machine_ip"
+    fi
+  fi
 fi
 
 read -p "Do you want to allow SSH access to this server? (y/N): " ssh_choice
@@ -580,13 +725,121 @@ echo ""
 # Create the helper directory if it doesn't exist
 sudo mkdir -p "${CUSTOM_PATH}/helper"
 
+# Create AI indexing configuration file if needed
+if [[ "$ETH_CLIENT_CHOICE" = "2" && "$ai_indexing_choice" == "y" ]]; then
+  echo ""
+  echo -e "${GREEN}Creating AI indexing configuration file${NC}"
+  
+  # Create the AI indexing directory
+  sudo mkdir -p "${CUSTOM_PATH}/ai_indexing"
+  
+  # Get the server's IP address for the node connection
+  SERVER_IP=$(hostname -I | awk '{print $1}')
+  
+  # Ask for database details if not already provided
+  read -p "Would you like to configure database details for the indexer? (y/N): " db_config_choice
+  if [[ "$db_config_choice" == "y" ]]; then
+    read -p "Enter database type (default: postgresql): " db_type
+    db_type=${db_type:-postgresql}
+    
+    read -p "Enter database username: " db_user
+    read -p "Enter database password: " db_password
+    read -p "Enter database host (default: localhost): " db_host
+    db_host=${db_host:-localhost}
+    
+    read -p "Enter database port (default: 5432): " db_port
+    db_port=${db_port:-5432}
+    
+    read -p "Enter database name (default: blockchain_index): " db_name
+    db_name=${db_name:-blockchain_index}
+    
+    DB_CONNECTION="${db_type}://${db_user}:${db_password}@${db_host}:${db_port}/${db_name}"
+  else
+    DB_CONNECTION="postgresql://username:password@localhost:5432/blockchain_index"
+  fi
+  
+  # Create the configuration file with actual values
+  cat > ai_indexing_config.json << EOL
+{
+  "node": {
+    "url": "http://${SERVER_IP}:8545",
+    "ws_url": "ws://${SERVER_IP}:8546"
+  },
+  "indexing": {
+    "start_block": 0,
+    "batch_size": 1000,
+    "concurrency": 5
+  },
+  "database": {
+    "type": "${db_type:-postgresql}",
+    "connection_string": "${DB_CONNECTION}"
+  },
+  "api": {
+    "port": 3001,
+    "host": "0.0.0.0",
+    "rate_limit": 100
+  }
+}
+EOL
+  
+  sudo mv ai_indexing_config.json "${CUSTOM_PATH}/ai_indexing/"
+  sudo chown $main_user:docker "${CUSTOM_PATH}/ai_indexing/ai_indexing_config.json"
+  echo "AI indexing configuration file created at ${CUSTOM_PATH}/ai_indexing/ai_indexing_config.json"
+  echo "The configuration includes your server's IP (${SERVER_IP}) and the database connection details you provided."
+  echo ""
+fi
+
 echo ""
 echo -e "${GREEN}copying over helper scripts${NC}"
 
-sudo cp setup_validator.sh "$CUSTOM_PATH/helper"
+# Copy only non-validator related scripts
 sudo cp setup_monitoring.sh "$CUSTOM_PATH/helper"
 sudo cp functions.sh "$CUSTOM_PATH/helper"
-sudo cp helper/* "$CUSTOM_PATH/helper"
+
+# Create a list of validator-related scripts to exclude
+VALIDATOR_SCRIPTS=(
+  "setup_validator.sh"
+  "key_mgmt.sh"
+  "exit_validator.sh"
+  "emergency_exit.sh"
+  "lh_batch_exit.sh"
+  "prysm_delete_validator.sh"
+  "prysm_fix.sh"
+  "prysm_read_accounts.sh"
+  "prysm_fix_host_ip.sh"
+  "bls_to_execution.sh"
+  "check_sync.sh"
+  "status_batch.sh"
+)
+
+# Copy helper scripts excluding validator scripts
+echo "Copying helper scripts excluding validator functionality..."
+for file in helper/*; do
+  if [ -f "$file" ]; then
+    filename=$(basename "$file")
+    skip=false
+    
+    # Check if the file is in the list of validator scripts
+    for validator_script in "${VALIDATOR_SCRIPTS[@]}"; do
+      if [ "$filename" == "$validator_script" ]; then
+        skip=true
+        break
+      fi
+    done
+    
+    # Copy the file if it's not in the exclude list
+    if [ "$skip" == "false" ]; then
+      sudo cp "$file" "$CUSTOM_PATH/helper/"
+      echo "Copied: $filename"
+    else
+      echo "Skipped validator script: $filename"
+    fi
+  fi
+done
+
+# Copy the verification script we created
+sudo cp "$script_dir/helper/verify_node.sh" "$CUSTOM_PATH/helper/"
+echo "Copied: verify_node.sh"
 
 # Permissions to folders
 sudo chmod -R +x $CUSTOM_PATH/helper/
@@ -612,17 +865,15 @@ sudo chown -R $main_user:docker $CUSTOM_PATH/menu.sh
 
 echo "Menu script has been generated and written to ${CUSTOM_PATH}/menu.sh"
 
-read -p "Do you want to add Desktop-Shortcuts to a menu for general logging and node/validator settings (Recommended)? [Y/n] " log_choice
+read -p "Do you want to add Desktop-Shortcuts to a menu for general logging and node settings (Recommended)? [Y/n] " log_choice
 echo ""
 echo -e "${RED}Note: You might have to right-click > allow launching on these${NC}"
 echo ""
 if [[ "$log_choice" =~ ^[Yy]$ || "$log_choice" == "" ]]; then
     create-desktop-shortcut ${CUSTOM_PATH}/helper/tmux_logviewer.sh tmux_LOGS
     create-desktop-shortcut ${CUSTOM_PATH}/helper/log_viewer.sh ui_LOGS
-    #create-desktop-shortcut ${CUSTOM_PATH}/helper/restart_docker.sh Restart-clients
     create-desktop-shortcut ${CUSTOM_PATH}/helper/stop_docker.sh Stop-clients
-    #create-desktop-shortcut ${CUSTOM_PATH}/helper/update_docker.sh Update-clients
-    create-desktop-shortcut ${CUSTOM_PATH}/menu.sh Validator-Menu ${CUSTOM_PATH}/helper/LogoVector.svg
+    create-desktop-shortcut ${CUSTOM_PATH}/menu.sh Node-Menu ${CUSTOM_PATH}/helper/LogoVector.svg
 fi
 
 echo "Menu generated and copied over to /usr/local/bin/plsmenu - you can open this helper menu by running plsmenu in the terminal"
@@ -642,49 +893,47 @@ sudo chmod 775 -R $CUSTOM_PATH/execution
 sudo chmod 777 -R ${INSTALL_PATH}
 
 clear
-read -p "$(echo -e ${GREEN})Would you like to setup a validator? (y/n):$(echo -e ${NC}))" VALIDATOR_CHOICE
-echo ""
-if [ "$VALIDATOR_CHOICE" = "y" ]; then
-  echo ""
-  echo "Starting setup_validator.sh script"
-  echo ""
-  cd ${start_dir}
-  #echo "debug"
-  sudo chmod +x setup_validator.sh
-  sudo ./setup_validator.sh
-  exit 0
 
-else
-  echo "Skipping creation of validator."
-  echo "You can always create a validator later by running the ./setup_validator.sh script separately."
-  echo ""
+# Verify the node setup is correct
+log_info "Verifying node setup..."
+
+# Verify Docker service is running correctly
+if ! verify_docker_services; then
+    log_error "Docker service verification failed"
+    echo -e "${YELLOW}WARNING: There were issues with the Docker service verification.${NC}"
+    echo "You may need to manually check and fix Docker before proceeding."
+    echo "See the log file for details: $LOG_FILE"
+    read -p "Do you want to continue anyway? (y/N): " continue_anyway
+    if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
+        echo "Exiting setup without completing. Please fix the issues and try again."
+        exit 1
+    fi
 fi
 
-read -p "Do you want to start the execution and consensus scripts now? [Y/n] " choice
+# Verify node containers are running
+if [ -n "$EXECUTION_CLIENT" ] && [ -n "$CONSENSUS_CLIENT" ]; then
+    if ! verify_node_containers "$EXECUTION_CLIENT" "$CONSENSUS_CLIENT"; then
+        log_error "Node container verification failed"
+        echo -e "${YELLOW}WARNING: The node containers are not running correctly.${NC}"
+        echo "You may need to manually check the container logs and fix any issues."
+        echo "See the log file for details: $LOG_FILE"
+        read -p "Do you want to continue anyway? (y/N): " continue_anyway
+        if [[ ! "$continue_anyway" =~ ^[Yy]$ ]]; then
+            echo "Exiting setup without completing. Please fix the issues and try again."
+            exit 1
+        fi
+    fi
+fi
 
-# Check if the user wants to run the scripts
-if [[ "$choice" =~ ^[Yy]$ || "$choice" == "" ]]; then
+log_info "Node setup verification completed"
 
-  # Generate the command to start the scripts
-  command1="${CUSTOM_PATH}/start_execution.sh > /dev/null 2>&1 &"
-  command2="${CUSTOM_PATH}/start_consensus.sh > /dev/null 2>&1 &"
+echo ""
+echo -e "${GREEN}Congratulations, node installation/setup is now complete.${NC}"
+echo ""  
+display_credits
 
-  # Print the command to the terminal
-  echo "Running command: $command1"
-  echo "Running command: $command2"
-
-  # Run the command
-  eval $command1
-  sleep 1
-  eval $command2
-  sleep 1
-fi  
-
-  clear
-  echo ""
-  echo -e "${GREEN}Congratulations, node installation/setup is now complete.${NC}"
-  echo ""  
-  display_credits
+# Log completion
+log_info "Node setup script completed successfully"
 
 # Inform the user that a reboot is required, making 'Yes' the default choice
 echo ""
@@ -694,11 +943,12 @@ read -p "" user_response
 
 # Treat an empty response as 'yes'
 if [[ -z "$user_response" ]] || [[ "$user_response" == "yes" ]] || [[ "$user_response" == "y" ]]; then
-    echo "Rebooting the system..."
-    sleep 1
+    log_info "Rebooting system as requested by user"
+    echo "Rebooting now..."
     sudo reboot
 else
-    echo "Please reboot the system manually to complete the setup."
-    exit 0
+    log_info "User chose not to reboot immediately"
+    echo "Please remember to reboot your system later to complete the setup."
 fi
-  exit 0
+
+exit 0

@@ -20,8 +20,9 @@ function cleanup() {
             exit 1
         fi
     }
-helper_scripts_path="/blockchain/helper"
-CUSTOM_PATH="/blockchain"
+# Get the CUSTOM_PATH from environment or use default
+CUSTOM_PATH="${CUSTOM_PATH:-/blockchain}"
+helper_scripts_path="${CUSTOM_PATH}/helper"
 
 script_launch() {
     echo "Launching script: ${CUSTOM_PATH}/helper/$1"
@@ -30,10 +31,10 @@ script_launch() {
 
 main_menu() {
     while true; do
-        main_opt=$(dialog --stdout --title "Main Menu $VERSION" --backtitle "created by DipSlayer 0xCB00d822323B6f38d13A1f951d7e31D9dfDED4AA" --menu "Choose an option:" 0 0 0 \
+        main_opt=$(dialog --stdout --title "Main Menu $VERSION" --backtitle "created by Maxim Broadcast" --menu "Choose an option:" 0 0 0 \
                           "Logviewer" "Start different Logviewer" \
-                          "Clients Menu" "Execution, Beacon and Validator Clients" \
-                          "Info and KeyManagment" "Tools for Key Management and Node/Validator Information" \
+                          "Clients Menu" "Execution and Beacon Clients" \
+                          "Info and Management" "Tools for Node Information" \
                           "System" "Update, Reboot, shutdown, Backup & Restore" \
                           "-" ""\
                           "exit" "Exit the program")
@@ -47,8 +48,8 @@ main_menu() {
                 "Clients Menu")
                     client_actions_submenu
                     ;;
-                "Info and KeyManagment")
-                    validator_setup_submenu
+                "Info and Management")
+                    node_info_submenu
                     ;;
                 "System")
                     system_submenu
@@ -70,24 +71,21 @@ main_menu() {
 
 logviewer_submenu() {
     while true; do
-        lv_opt=$(dialog --stdout --title "Logviewer Menu $VERSION" --stdout --backtitle "created by DipSlayer 0xCB00d822323B6f38d13A1f951d7e31D9dfDED4AA" --menu "Choose an option:" 0 0 0 \
-                        "Tabbed-Terminal Logs" "Multiple Tabs" \
-                        "Tmux-Style Logs" "Single Window" \
-                        "-" ""\
-                        "back" "Back to main menu")
+        lv_opt=$(dialog --stdout --title "Logviewer Menu $VERSION" --stdout --backtitle "created by Maxim Broadcast" --menu "Choose an option:" 0 0 0 \
+                        "Tabbed View" "⏱️ Log files in a Tabbed View - gui" \
+                        "Tmux View" "⏱️ Log files in Tmux - console" \
+                        "BACK" "⏱️ Return to the Main Menu")
 
         case $? in
           0)
             case $lv_opt in
-                "Tabbed-Terminal Logs")
+                "Tabbed View")
                     clear && script_launch "log_viewer.sh"
                     ;;
-                "Tmux-Style Logs")
+                "Tmux View")
                     clear && script_launch "tmux_logviewer.sh"
                     ;;
-                "-")
-                    ;;
-                "back")
+                "BACK")
                     break
                     ;;
             esac
@@ -101,17 +99,10 @@ logviewer_submenu() {
 
 client_actions_submenu() {
     while true; do
-        ca_opt=$(dialog --stdout --title "Client Menu $VERSION" --backtitle "created by DipSlayer 0xCB00d822323B6f38d13A1f951d7e31D9dfDED4AA" --menu "Choose an option:" 0 0 0 \
-                        "Execution-Client Menu" ""\
-                        "Beacon-Client Menu" ""\
-                        "Validator-Client Menu" ""\
-                        "-" ""\
-                        "Start all Clients" ""\
-                        "Stop all Clients" ""\
-                        "Restart all Clients" ""\
-                        "Update all Clients" ""\
-                        "-" ""\
-                        "back" "Back to main menu")
+        ca_opt=$(dialog --stdout --title "Client Menu $VERSION" --backtitle "created by Maxim Broadcast" --menu "Choose an option:" 0 0 0 \
+                        "Execution-Client Menu" "⚙️ Manage Execution-Client-Settings" \
+                        "Beacon-Client Menu" "⚙️ Manage Beacon-Client-Settings" \
+                        "BACK" "⏱️ Return to the Main Menu")
 
         case $? in
           0)
@@ -122,33 +113,7 @@ client_actions_submenu() {
                 "Beacon-Client Menu")
                     beacon_submenu
                     ;;
-                "Validator-Client Menu")
-                    validator_submenu
-                    ;;
-                "-")
-                    ;;
-                "Start all Clients")
-                    clear
-                    ${CUSTOM_PATH}/start_execution.sh
-                    ${CUSTOM_PATH}/start_consensus.sh
-                    ${CUSTOM_PATH}/start_validator.sh
-                    ;;
-                "Stop all Clients")
-                    clear && script_launch "stop_docker.sh"
-                    ;;
-                "Restart all Clients")
-                    clear && script_launch "stop_docker.sh"
-                    ${CUSTOM_PATH}/start_execution.sh
-                    ${CUSTOM_PATH}/start_consensus.sh
-                    ${CUSTOM_PATH}/start_validator.sh
-                    ;;
-                "Update all Clients")
-                    clear && script_launch "update_docker.sh"
-                    ${CUSTOM_PATH}/start_execution.sh
-                    ${CUSTOM_PATH}/start_consensus.sh
-                    ${CUSTOM_PATH}/start_validator.sh
-                    ;;
-                "back")
+                "BACK")
                     break
                     ;;
             esac
@@ -162,50 +127,46 @@ client_actions_submenu() {
 
 execution_submenu() {
     while true; do
-        exe_opt=$(dialog --stdout --title "Execution-Client Menu $VERSION" --backtitle "created by DipSlayer 0xCB00d822323B6f38d13A1f951d7e31D9dfDED4AA" --menu "Choose an option:" 0 0 0 \
-                        "Start Execution-Client" "" \
-                        "Stop Execution-Client" "" \
-                        "Restart Execution-Client" "" \
-                        "-" ""\
-                        "Edit Execution-Client Config" "" \
-                        "Show Logs" "" \
-                        "Update Execution-Client" "" \
-                        "-" ""\
-                        "back" "Back to Client Actions Menu")
+        exe_opt=$(dialog --stdout --title "Execution-Client Menu $VERSION" --backtitle "created by Maxim Broadcast" --menu "Choose an option:" 0 0 0 \
+                         "Container Start" "⚙️ Start Execution-Client" \
+                         "Container Stop" "⚙️ Stop Execution-Client" \
+                         "Container Restart" "⚙️ Restart Execution-Client" \
+                         "Container Status" "⚙️ Execution-Client Status" \
+                         "Docker Logs" "⚙️ Show the Execution-Client Logs" \
+                         "Update Client" "⚙️ Update the Execution-Client" \
+                         "BACK" "⏱️ Return to the Client-Menu")
 
         case $? in
           0)
             case $exe_opt in
-                "Start Execution-Client")
+                "Container Start")
                     clear && ${CUSTOM_PATH}/start_execution.sh
                     ;;
-                "Stop Execution-Client")
+                "Container Stop")
                     clear && sudo docker stop -t 300 execution
                     sleep 1
                     sudo docker container prune -f
                     ;;
-                "Restart Execution-Client")
+                "Container Restart")
                     clear && sudo docker stop -t 300 execution
                     sleep 1
                     sudo docker container prune -f
                     clear && ${CUSTOM_PATH}/start_execution.sh
                     ;;
-                 "Edit Execution-Client Config")
-                    clear && sudo nano "${CUSTOM_PATH}/start_execution.sh"
+                "Container Status")
+                    clear && sudo docker ps -a | grep execution
                     ;;
-                 "Show Logs")
+                "Docker Logs")
                     clear && sudo docker logs -f execution
                     ;;
-                 "Update Execution-Client")
+                "Update Client")
                    clear && docker stop -t 300 execution
                    docker container prune -f && docker image prune -f
                    docker rmi registry.gitlab.com/pulsechaincom/go-pulse > /dev/null 2>&1
                    docker rmi registry.gitlab.com/pulsechaincom/go-erigon > /dev/null 2>&1
                    ${CUSTOM_PATH}/start_execution.sh
                    ;;
-                "-")
-                    ;;
-                "back")
+                "BACK")
                     break
                     ;;
             esac
@@ -219,50 +180,46 @@ execution_submenu() {
 
 beacon_submenu() {
     while true; do
-        bcn_opt=$(dialog --stdout --title "Beacon-Client Menu $VERSION" --backtitle "created by DipSlayer 0xCB00d822323B6f38d13A1f951d7e31D9dfDED4AA" --menu "Choose an option:" 0 0 0 \
-                        "Start Beacon-Client" "" \
-                        "Stop Beacon-Client" "" \
-                        "Restart Beacon-Client" "" \
-                        "-" ""\
-                        "Edit Beacon-Client Config" "" \
-                        "Show Logs" "" \
-                        "Update Beacon-Client" "" \
-                        "-" ""\
-                        "back" "Back to Client Actions Menu")
+        bcn_opt=$(dialog --stdout --title "Beacon-Client Menu $VERSION" --backtitle "created by Maxim Broadcast" --menu "Choose an option:" 0 0 0 \
+                         "Container Start" "⚙️ Start Beacon-Client" \
+                         "Container Stop" "⚙️ Stop Beacon-Client" \
+                         "Container Restart" "⚙️ Restart Beacon-Client" \
+                         "Container Status" "⚙️ Beacon-Client Status" \
+                         "Docker Logs" "⚙️ Show the Beacon-Client Logs" \
+                         "Update Client" "⚙️ Update the Beacon-Client" \
+                         "BACK" "⏱️ Return to the Client-Menu")
 
         case $? in
           0)
             case $bcn_opt in
-                "Start Beacon-Client")
+                "Container Start")
                     clear && ${CUSTOM_PATH}/start_consensus.sh
                     ;;
-                "Stop Beacon-Client")
+                "Container Stop")
                     clear && sudo docker stop -t 180 beacon 
                     sleep 1
                     sudo docker container prune -f
                     ;;
-                "Restart Beacon-Client")
+                "Container Restart")
                     clear && sudo docker stop -t 180 beacon
                     sleep 1
                     sudo docker container prune -f
                     ${CUSTOM_PATH}/start_consensus.sh
                     ;;
-                 "Edit Beacon-Client Config")
-                    clear && sudo nano "${CUSTOM_PATH}/start_consensus.sh"
+                "Container Status")
+                    clear && sudo docker ps -a | grep beacon
                     ;;
-                 "Show Logs")
+                "Docker Logs")
                     clear && sudo docker logs -f beacon
                     ;;
-                 "Update Beacon-Client")
+                "Update Client")
                    clear && docker stop -t 180 beacon
                    docker container prune -f && docker image prune -f
                    docker rmi registry.gitlab.com/pulsechaincom/prysm-pulse/beacon-chain > /dev/null 2>&1
                    docker rmi registry.gitlab.com/pulsechaincom/lighthouse-pulse > /dev/null 2>&1
                    ${CUSTOM_PATH}/start_consensus.sh
                    ;;
-                "-")
-                    ;;
-                "back")
+                "BACK")
                     break
                     ;;
             esac
@@ -274,52 +231,49 @@ beacon_submenu() {
     done
 }
 
-validator_submenu() {
+node_info_submenu() {
     while true; do
-        val_opt=$(dialog --stdout --title "Validator-Client Menu $VERSION" --backtitle "created by DipSlayer 0xCB00d822323B6f38d13A1f951d7e31D9dfDED4AA" --menu "Choose an option:" 0 0 0 \
-                        "Start Validator-Client" "" \
-                        "Stop Validator-Client" "" \
-                        "Restart Validator-Client" "" \
-                        "-" ""\
-                        "Edit Validator-Client Config" "" \
-                        "Show Logs" ""\
-                        "Update Validator-Client" "" \
-                        "-" "" \
-                        "back" "Back to Client Actions Menu")
+        options=$(dialog --stdout --title "Node Information & Management $VERSION" --backtitle "created by Maxim Broadcast" --menu "Choose an option:" 0 0 0 \
+                         "Node Information" "⚙️ Check Node Status Information" \
+                         "RPC Status" "⚙️ Check RPC Connection Status" \
+                         "Sync Status" "⚙️ Check Sync Progress" \
+                         "BACK" "⏱️ Return to the Main Menu")
 
         case $? in
           0)
-            case $val_opt in
-                "Start Validator-Client")
-                    clear && ${CUSTOM_PATH}/start_validator.sh
+            case $options in
+                "Node Information")
+                    clear 
+                    echo "Node Status Information (Non-Validator Edition)"
+                    echo "----------------------------------------------"
+                    echo "This is a non-validator node setup."
+                    echo "This version is designed for running a PulseChain node for syncing with"
+                    echo "the network, providing RPC endpoints, and monitoring the blockchain."
+                    echo ""
+                    echo "Validator functionality has been deliberately removed from this version."
+                    echo ""
+                    echo "Current configuration:"
+                    if docker ps | grep -q "execution"; then
+                        echo "- Execution client: $(docker ps | grep execution | awk '{print $2}' | cut -d':' -f1 | rev | cut -d'/' -f1 | rev)"
+                    else
+                        echo "- Execution client: Not running"
+                    fi
+                    if docker ps | grep -q "beacon"; then
+                        echo "- Consensus client: $(docker ps | grep beacon | awk '{print $2}' | cut -d':' -f1 | rev | cut -d'/' -f1 | rev)"
+                    else
+                        echo "- Consensus client: Not running"
+                    fi
+                    echo ""
+                    echo "Press any key to continue..."
+                    read -n 1
                     ;;
-                "Stop Validator-Client")${CUSTOM_PATH}/
-                    clear && sudo docker stop -t 180 validator
-                    sleep 1
-                    sudo docker container prune -f
+                "RPC Status")
+                    clear && script_launch "check_rpc_connection.sh"
                     ;;
-                "Restart Validator-Client")
-                    clear && sudo docker stop -t 180 validator
-                    sleep 1
-                    sudo docker container prune -f
-                    clear && ${CUSTOM_PATH}/start_validator.sh
+                "Sync Status")
+                    clear && script_launch "check_sync.sh"
                     ;;
-                "Edit Validator-Client Config")
-                    clear && sudo nano "${CUSTOM_PATH}/start_validator.sh"
-                    ;;
-                "Show Logs")
-                    clear && sudo docker logs -f validator
-                    ;;
-                "Update Validator-Client")
-                   clear && docker stop -t 180 validator
-                   docker container prune -f && docker image prune -f
-                   docker rmi registry.gitlab.com/pulsechaincom/prysm-pulse/validator > /dev/null 2>&1
-                   docker rmi registry.gitlab.com/pulsechaincom/lighthouse-pulse > /dev/null 2>&1
-                   ${CUSTOM_PATH}/start_validator.sh
-                   ;;
-                "-")
-                    ;;
-                "back")
+                "BACK")
                     break
                     ;;
             esac
@@ -331,165 +285,47 @@ validator_submenu() {
     done
 }
 
-
-validator_setup_submenu() {
-    while true; do
-        options=("Key Management" "Generate, Add, Import or Restore Validator-Keys" \
-                 "-" "" \
-                 "Convert BLS-Keys" "00-BLS to 01-Execution Wallet conversion" \
-                 "Exit your Validator(s)" "Initiate the Exit of your Validator(s)" \
-                 "-" "" \
-                 "Client Info" "Prints currently used client version" \
-                 "-" "" \
-                 "GoPLS - BlockMonitor" "Compare local Block# with scan.puslechain.com" \
-                 "GoPLS - Database Prunning" "Prune your local DB to freeup space" \
-                 "-" "" \
-                 "Prysm - List Accounts" "List all Accounts from the Validator DB" \
-                 "Prysm - Delete Validator" "Delete/Remove Accounts from Validator" \
-                 "Prysm - Add p2p-host-ip" "Fix for v.2.2.4" \
-                 "Prysm - Temp. fix CPU-Bug" "Temporarly revert back to v2.2.2" \
-                 "-" "" \
-                 "Validator Info per indice" "Backup, should beacon.pulsechain.com be down"\
-                 "Check for Sync Committee" "Checks if local Valis are in the Sync Committee"\
-                 "-" ""
-                 "ReRun Initial Setup" "" \
-                 "-" ""\
-                 "back" "Back to main menu; Return to the main menu.")
-        vs_opt=$(dialog --stdout --title "Info and KeyManagment $VERSION" --backtitle "created by DipSlayer 0xCB00d822323B6f38d13A1f951d7e31D9dfDED4AA" --menu "Choose an option:" 0 0 0 "${options[@]}")
-        case $? in
-            0)
-                case $vs_opt in
-                    "Key Management")
-                        clear && script_launch "key_mgmt.sh"
-                        ;;
-                    "-")
-                        ;;
-                    "Convert BLS-Keys")
-                        clear && script_launch "bls_to_execution.sh"
-                        ;;
-                    "Exit your Validator(s)")
-                        clear && script_launch "exit_validator.sh"
-                        ;;
-                    "-")
-                        ;;
-                    "Client Info")
-                       clear && script_launch "show_version.sh"
-                       ;;
-                    "-")
-                       ;;
-                    "GoPLS - BlockMonitor")
-                        clear && script_launch "compare_blocks.sh"
-                        ;;
-                    "GoPLS - Database Prunning")
-                        tmux new-session -s prune $CUSTOM_PATH/helper/gopls_prune.sh
-                        ;;
-                    "-")
-                        ;;                        
-                    "Prysm - List Accounts")
-                        clear && script_launch "prysm_read_accounts.sh"
-                        ;;
-                    "Prysm - Delete Validator")
-                        clear && script_launch "prysm_delete_validator.sh"
-                        ;;
-                    "Prysm - Add p2p-host-ip")
-                        clear && script_launch "prysm_fix_host_ip.sh"
-                        ;;                    
-                    "Prysm - Temp. fix CPU-Bug")
-                       clear && script_launch "prysm_fix.sh"
-                       ;;
-                    "-")
-                        ;;
-                    "Validator Info per indice")
-                        clear && script_launch "status_batch.sh"
-                        ;;
-                    "Check for Sync Committee")
-                       clear && script_launch "check_sync.sh"
-                       ;;
-                    "-")
-                        ;;                    
-                    "ReRun Initial Setup")
-                        clear && script_launch "setup_validator.sh"
-                        ;;
-                    "back")
-                        break
-                        ;;
-                esac
-                ;;
-            1)
-                break
-                ;;
-        esac
-    done
-}
-
-
 system_submenu() {
     while true; do
-        sys_opt=$(dialog --stdout --title "System Menu $VERSION" --backtitle "created by DipSlayer 0xCB00d822323B6f38d13A1f951d7e31D9dfDED4AA" --menu "Choose an option:" 0 0 0 \
-                        "Update Local Helper-Files" "Get latest additions/changes for plsmenu" \
-                        "Add Graceful-Shutdown to System" "for system shutdown/reboot" \
-                        "-" "" \
-                        "Update & Reboot System" "" \
-                        "Reboot System" "" \
-                        "Shutdown System" "" \
-                        "-" "" \
-                        "Backup and Restore" "Chaindata for go-pulse" \
-                        "-" "" \
-                        "back" "Back to main menu")
+        sys_opt=$(dialog --stdout --title "System Menu $VERSION" --backtitle "created by Maxim Broadcast" --menu "Choose an option:" 0 0 0 \
+                         "Check Network" "⚙️ Get Network Status" \
+                         "Check System" "⚙️ Get System Status" \
+                         "Sytem-Time" "⚙️ Sync System-Time" \
+                         "Sync Status" "⚙️ Check if client is Synced" \
+                         "BlockHeight" "⚙️ Check Current BlockHeight" \
+                         "Blocknotifier On" "⚙️ Start the Blocknumber notification" \
+                         "Blocknotifier Off" "⚙️ Stop the Blocknumber notification" \
+                         "Archive Node Setup" "⚙️ Setup Archive Node" \
+                         "BACK" "⏱️ Return to the Main Menu")
 
         case $? in
           0)
             case $sys_opt in
-                "Update Local Helper-Files")
-                    clear && script_launch "update_files.sh"
+                "Check Network")
+                    clear && script_launch "network_status.sh"
                     ;;
-                "Add Graceful-Shutdown to System")
-                    clear && script_launch "grace.sh"
-                    ;;                    
-                "-")
-                    ;;                    
-                "Update & Reboot System")
-                    clear
-                    echo "Stopping running docker container..."
-                    script_launch "stop_docker.sh"
-                    sleep 3
-                    clear
-                    echo "Getting System updates..."
-                    sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y && sudo apt autoremove -y
-                    read -p "Update done, reboot now? Press enter to continue or Ctrl+C to cancel."
-                    sleep 5
-                    sudo reboot now
+                "Check System")
+                    clear && script_launch "system_status.sh"
                     ;;
-                "Reboot System")
-                    echo "Stopping running docker container..."
-                    script_launch "stop_docker.sh"  
-                    sleep 3
-                    read -p "Reboot now? Press enter to continue or Ctrl+C to cancel."
-                    sudo reboot now
+                "Sytem-Time")
+                    clear && script_launch "sync_time.sh"
                     ;;
-                "Shutdown System")
-                    echo "Stopping running docker container..."
-                    script_launch "stop_docker.sh"  
-                    sleep 3
-                    read -p "Shutdown now? Press enter to continue or Ctrl+C to cancel."                    
-                    sudo shutdown now
+                "Sync Status")
+                    clear && script_launch "sync_status.sh"
                     ;;
-
-                "-")
+                "BlockHeight")
+                    clear && script_launch "block_height.sh"
                     ;;
-                "Backup and Restore")
-                    if tmux has-session -t bandr 2>/dev/null; then
-                    # If the session exists, attach to it
-                    tmux attach-session -t bandr
-                    else
-                    # If the session does not exist, create and attach to it
-                    tmux new-session -d -s bandr $CUSTOM_PATH/helper/backup_restore.sh
-                    tmux attach-session -t bandr
-                    fi
+                "Blocknotifier On")
+                    clear && script_launch "block_notifier_on.sh"
                     ;;
-                "-")
+                "Blocknotifier Off")
+                    clear && script_launch "block_notifier_off.sh"
                     ;;
-                "back")
+                "Archive Node Setup")
+                    clear && script_launch "archive_node_setup.sh"
+                    ;;
+                "BACK")
                     break
                     ;;
             esac
