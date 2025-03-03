@@ -1,11 +1,12 @@
 #!/bin/bash
 
 # ===============================================================================
-# PulseChain Node Network Configuration Switcher
+# PulseChain & Ethereum Node Network Configuration Switcher
 # ===============================================================================
 # This script manages network configuration parameters for optimizing your node
 # It allows switching between local mode (for personal use) and public mode (for RPC endpoints)
-# Version: 0.1.0
+# Supports both PulseChain and Ethereum networks
+# Version: 0.2.0
 # ===============================================================================
 
 # Colors for better formatting
@@ -33,12 +34,16 @@ if [ -z "$INSTALL_PATH" ]; then
     fi
 fi
 
+# Get the selected network from environment or use default
+SELECTED_NETWORK="${SELECTED_NETWORK:-pulsechain}"
+
 # Configuration file paths
 NET_CONFIG_DIR="$INSTALL_PATH/network_config"
 LOCAL_CONFIG="$NET_CONFIG_DIR/local_network.conf"
 PUBLIC_CONFIG="$NET_CONFIG_DIR/public_network.conf"
 ACTIVE_CONFIG="$NET_CONFIG_DIR/active_network.conf"
 MODE_INDICATOR="$NET_CONFIG_DIR/current_mode"
+NETWORK_INDICATOR="$NET_CONFIG_DIR/current_network"
 
 # Create config directory if it doesn't exist
 mkdir -p "$NET_CONFIG_DIR"
@@ -53,9 +58,10 @@ section() {
 # Create default local configuration (optimized for high-throughput local/VM access)
 create_local_config() {
     cat > "$LOCAL_CONFIG" << EOF
-# PulseChain Node - Local/VM Mode Network Configuration
+# PulseChain & Ethereum Node - Local/VM Mode Network Configuration
 # Optimized for high-throughput between local machine and VMs
 # Last updated: $(date)
+# Network: $SELECTED_NETWORK
 
 # Increase TCP buffer sizes for high throughput
 net.core.rmem_max = 16777216
@@ -78,9 +84,10 @@ EOF
 # Create default public configuration (optimized for many external connections)
 create_public_config() {
     cat > "$PUBLIC_CONFIG" << EOF
-# PulseChain Node - Public Mode Network Configuration
+# PulseChain & Ethereum Node - Public Mode Network Configuration
 # Optimized for handling many external connections (public RPC endpoint)
 # Last updated: $(date)
+# Network: $SELECTED_NETWORK
 
 # Increase TCP buffer sizes for high throughput
 net.core.rmem_max = 16777216
@@ -94,6 +101,7 @@ net.core.netdev_max_backlog = 5000
 net.ipv4.tcp_max_syn_backlog = 8096
 net.ipv4.tcp_tw_reuse = 1
 net.ipv4.tcp_fin_timeout = 30
+net.ipv4.tcp_max_tw_buckets = 2000000
 net.ipv4.ip_local_port_range = 1024 65535
 
 # Improve handling of busy connections
@@ -106,6 +114,11 @@ net.ipv4.tcp_congestion_control = cubic
 # Connection protection
 net.ipv4.tcp_synack_retries = 2
 net.ipv4.tcp_syncookies = 1
+
+# Network-specific optimizations
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_sack = 1
 EOF
 }
 
@@ -113,13 +126,13 @@ EOF
 apply_network_config() {
     local config_file="$1"
     if [ -f "$config_file" ]; then
-        echo "Applying network configuration..."
+        echo "Applying network configuration for $SELECTED_NETWORK..."
         
         # Copy to sysctl.d directory for persistence
-        sudo cp "$config_file" /etc/sysctl.d/99-pulsechain-network.conf
+        sudo cp "$config_file" "/etc/sysctl.d/99-${SELECTED_NETWORK}-network.conf"
         
         # Apply settings
-        sudo sysctl -p /etc/sysctl.d/99-pulsechain-network.conf
+        sudo sysctl -p "/etc/sysctl.d/99-${SELECTED_NETWORK}-network.conf"
         
         # Create a symlink to active config
         ln -sf "$config_file" "$ACTIVE_CONFIG"
@@ -144,7 +157,8 @@ switch_network_mode() {
             
             if apply_network_config "$LOCAL_CONFIG"; then
                 echo "local" > "$MODE_INDICATOR"
-                echo -e "${GREEN}Switched to LOCAL mode${NC}"
+                echo "$SELECTED_NETWORK" > "$NETWORK_INDICATOR"
+                echo -e "${GREEN}Switched to LOCAL mode for $SELECTED_NETWORK${NC}"
                 echo "Network optimized for high-throughput local/VM access"
             fi
             ;;
@@ -155,7 +169,8 @@ switch_network_mode() {
             
             if apply_network_config "$PUBLIC_CONFIG"; then
                 echo "public" > "$MODE_INDICATOR"
-                echo -e "${GREEN}Switched to PUBLIC mode${NC}"
+                echo "$SELECTED_NETWORK" > "$NETWORK_INDICATOR"
+                echo -e "${GREEN}Switched to PUBLIC mode for $SELECTED_NETWORK${NC}"
                 echo "Network optimized for handling many external connections"
             fi
             ;;
@@ -168,9 +183,11 @@ switch_network_mode() {
 
 # Function to show current network mode and configuration
 show_network_mode() {
-    if [ -f "$MODE_INDICATOR" ]; then
+    if [ -f "$MODE_INDICATOR" ] && [ -f "$NETWORK_INDICATOR" ]; then
         local current_mode=$(cat "$MODE_INDICATOR")
-        echo -e "Current network mode: ${GREEN}${current_mode^^}${NC}"
+        local current_network=$(cat "$NETWORK_INDICATOR")
+        echo -e "Current network: ${GREEN}${current_network^^}${NC}"
+        echo -e "Current mode: ${GREEN}${current_mode^^}${NC}"
         
         if [ -f "$ACTIVE_CONFIG" ]; then
             echo ""
@@ -179,13 +196,13 @@ show_network_mode() {
             cat "$ACTIVE_CONFIG" | grep -v "^#" | grep -v "^$"
         fi
     else
-        echo "Network mode not set. Please run 'network_config.sh local' or 'network_config.sh public'"
+        echo "Network configuration not set. Please run 'network_config.sh local' or 'network_config.sh public'"
     fi
 }
 
 # Display help information
 show_help() {
-    echo "PulseChain Node Network Configuration Switcher"
+    echo "PulseChain & Ethereum Node Network Configuration Switcher"
     echo "Usage: $0 [local|public|status|edit-local|edit-public]"
     echo ""
     echo "Options:"
@@ -195,7 +212,10 @@ show_help() {
     echo "  edit-local  - Edit local mode configuration"
     echo "  edit-public - Edit public mode configuration"
     echo ""
-    echo "Example: $0 local"
+    echo "Environment Variables:"
+    echo "  SELECTED_NETWORK - Set to 'pulsechain' or 'ethereum' (default: pulsechain)"
+    echo ""
+    echo "Example: SELECTED_NETWORK=ethereum $0 public"
 }
 
 # Main function

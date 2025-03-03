@@ -24,14 +24,26 @@ function cleanup() {
 CUSTOM_PATH="${CUSTOM_PATH:-/blockchain}"
 helper_scripts_path="${CUSTOM_PATH}/helper"
 
+# Add network selection variable
+SELECTED_NETWORK="${SELECTED_NETWORK:-pulsechain}"  # Default to PulseChain
+
 script_launch() {
     echo "Launching script: ${CUSTOM_PATH}/helper/$1"
     ${CUSTOM_PATH}/helper/$1
 }
 
+# Function to set the active network
+set_network() {
+    SELECTED_NETWORK=$1
+    echo "Switched to $SELECTED_NETWORK network"
+    sleep 2
+}
+
 main_menu() {
     while true; do
-        main_opt=$(dialog --stdout --title "Main Menu $VERSION" --backtitle "created by Maxim Broadcast" --menu "Choose an option:" 0 0 0 \
+        network_status="Current Network: ${SELECTED_NETWORK^^}"
+        main_opt=$(dialog --stdout --title "Main Menu $VERSION" --backtitle "created by Maxim Broadcast - $network_status" --menu "Choose an option:" 0 0 0 \
+                          "Network Selection" "Switch between PulseChain and Ethereum" \
                           "Logviewer" "Start different Logviewer" \
                           "Clients Menu" "Execution and Beacon Clients" \
                           "Info and Management" "Tools for Node Information" \
@@ -42,6 +54,9 @@ main_menu() {
         case $? in
           0)
             case $main_opt in
+                "Network Selection")
+                    network_selection_menu
+                    ;;
                 "Logviewer")
                     logviewer_submenu
                     ;;
@@ -58,6 +73,36 @@ main_menu() {
                     ;;
                 "exit")
                     clear
+                    break
+                    ;;
+            esac
+            ;;
+          1)
+            break
+            ;;
+        esac
+    done
+}
+
+network_selection_menu() {
+    while true; do
+        net_opt=$(dialog --stdout --title "Network Selection Menu $VERSION" --backtitle "created by Maxim Broadcast" --menu "Choose a network:" 0 0 0 \
+                        "PulseChain" "Switch to PulseChain network" \
+                        "Ethereum" "Switch to Ethereum network" \
+                        "BACK" "Return to the Main Menu")
+
+        case $? in
+          0)
+            case $net_opt in
+                "PulseChain")
+                    set_network "pulsechain"
+                    break
+                    ;;
+                "Ethereum")
+                    set_network "ethereum"
+                    break
+                    ;;
+                "BACK")
                     break
                     ;;
             esac
@@ -127,7 +172,14 @@ client_actions_submenu() {
 
 execution_submenu() {
     while true; do
-        exe_opt=$(dialog --stdout --title "Execution-Client Menu $VERSION" --backtitle "created by Maxim Broadcast" --menu "Choose an option:" 0 0 0 \
+        # Set Docker image based on selected network
+        if [ "$SELECTED_NETWORK" = "pulsechain" ]; then
+            EXECUTION_IMAGE="registry.gitlab.com/pulsechaincom/go-pulse"
+        else
+            EXECUTION_IMAGE="ethereum/client-go"
+        fi
+
+        exe_opt=$(dialog --stdout --title "Execution-Client Menu $VERSION" --backtitle "created by Maxim Broadcast - $SELECTED_NETWORK" --menu "Choose an option:" 0 0 0 \
                          "Container Start" "⚙️ Start Execution-Client" \
                          "Container Stop" "⚙️ Stop Execution-Client" \
                          "Container Restart" "⚙️ Restart Execution-Client" \
@@ -162,8 +214,7 @@ execution_submenu() {
                 "Update Client")
                    clear && docker stop -t 300 execution
                    docker container prune -f && docker image prune -f
-                   docker rmi registry.gitlab.com/pulsechaincom/go-pulse > /dev/null 2>&1
-                   docker rmi registry.gitlab.com/pulsechaincom/go-erigon > /dev/null 2>&1
+                   docker rmi $EXECUTION_IMAGE > /dev/null 2>&1
                    ${CUSTOM_PATH}/start_execution.sh
                    ;;
                 "BACK")
@@ -180,7 +231,14 @@ execution_submenu() {
 
 beacon_submenu() {
     while true; do
-        bcn_opt=$(dialog --stdout --title "Beacon-Client Menu $VERSION" --backtitle "created by Maxim Broadcast" --menu "Choose an option:" 0 0 0 \
+        # Set Docker image based on selected network
+        if [ "$SELECTED_NETWORK" = "pulsechain" ]; then
+            BEACON_IMAGE="registry.gitlab.com/pulsechaincom/prysm-pulse/beacon-chain"
+        else
+            BEACON_IMAGE="prysmaticlabs/prysm-beacon-chain"
+        fi
+
+        bcn_opt=$(dialog --stdout --title "Beacon-Client Menu $VERSION" --backtitle "created by Maxim Broadcast - $SELECTED_NETWORK" --menu "Choose an option:" 0 0 0 \
                          "Container Start" "⚙️ Start Beacon-Client" \
                          "Container Stop" "⚙️ Stop Beacon-Client" \
                          "Container Restart" "⚙️ Restart Beacon-Client" \
@@ -215,8 +273,7 @@ beacon_submenu() {
                 "Update Client")
                    clear && docker stop -t 180 beacon
                    docker container prune -f && docker image prune -f
-                   docker rmi registry.gitlab.com/pulsechaincom/prysm-pulse/beacon-chain > /dev/null 2>&1
-                   docker rmi registry.gitlab.com/pulsechaincom/lighthouse-pulse > /dev/null 2>&1
+                   docker rmi $BEACON_IMAGE > /dev/null 2>&1
                    ${CUSTOM_PATH}/start_consensus.sh
                    ;;
                 "BACK")
