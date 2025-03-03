@@ -1,0 +1,116 @@
+version: '3.8'
+
+# Common configuration that can be reused
+x-common-variables: &common-variables
+  # Network selection (either "pulsechain" or "ethereum")
+  NETWORK: ${NETWORK:-pulsechain}
+  # Node type (full or archive)
+  NODE_TYPE: ${NODE_TYPE:-full}
+  # Client selection
+  EXECUTION_CLIENT: ${EXECUTION_CLIENT:-geth}
+  CONSENSUS_CLIENT: ${CONSENSUS_CLIENT:-lighthouse}
+
+services:
+  # Execution client (Geth/Erigon)
+  execution:
+    image: ${EXECUTION_CLIENT_IMAGE:-ethereum/client-go:latest}
+    container_name: execution
+    restart: unless-stopped
+    volumes:
+      - ./chaindata/${NETWORK}:/chaindata
+      - ./config:/config
+    ports:
+      - "8545:8545"  # RPC
+      - "8546:8546"  # WebSocket
+      - "30303:30303"  # P2P
+    environment:
+      <<: *common-variables
+    command: >
+      --datadir=/chaindata
+      --config=/config/${NETWORK}_${EXECUTION_CLIENT}.toml
+      --http
+      --http.addr=0.0.0.0
+      --http.port=8545
+      --http.api=eth,net,web3
+      --ws
+      --ws.addr=0.0.0.0
+      --ws.port=8546
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Consensus client (Lighthouse/Prysm)
+  consensus:
+    image: ${CONSENSUS_CLIENT_IMAGE:-sigp/lighthouse:latest}
+    container_name: consensus
+    restart: unless-stopped
+    volumes:
+      - ./beacondata/${NETWORK}:/beacondata
+      - ./config:/config
+    ports:
+      - "9000:9000"  # P2P
+      - "5052:5052"  # HTTP API
+    environment:
+      <<: *common-variables
+    command: >
+      beacon_node
+      --datadir=/beacondata
+      --execution-endpoint=http://execution:8551
+      --http
+      --http-address=0.0.0.0
+      --network=${NETWORK}
+    depends_on:
+      - execution
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Prometheus monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Grafana dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/grafana:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  prometheus_data: {} 
