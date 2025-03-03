@@ -1,0 +1,64 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+log/
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Blockchain Data
+blockchain/
+chaindata/
+geth/
+lighthouse/
+prysm/
+
+# Docker
+.docker/
+
+# Environment Variables
+.env
+.env.*
+
+# Temporary files
+*.tmp
+temp/
+tmp/
+
+# Node specific
+node_modules/
+npm-debug.log*
+
+# Backup files
+*.bak
+*~
+*.backup
+
+# Debug files
+debug/
+*.debug
+
+# Configuration backups
+*.conf.bak
+config.*.json
+
+# System files that might appear
+.directory
+.Trash-*
+
+# Monitoring data
+grafana/
+prometheus/ 
