@@ -1,4 +1,4 @@
-# Blockchain Node Suite - Single Network Installation
+# Blockchain Node Suite - PulseChain & Ethereum
 
 ## ⚠️ ALPHA RELEASE WARNING (v0.1.1) ⚠️
 
