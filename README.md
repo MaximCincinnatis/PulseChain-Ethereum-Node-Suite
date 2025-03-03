@@ -103,6 +103,50 @@ OR:
 ./setup_eth_node.sh
 ```
 
+### Option 1: Docker Compose (Recommended)
+
+This is the easiest way to get started. Docker Compose manages all components automatically.
+
+1. **Prerequisites**:
+   ```bash
+   # Install Docker
+   curl -fsSL https://get.docker.com -o get-docker.sh
+   sudo sh get-docker.sh
+
+   # Install Docker Compose
+   sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+   sudo chmod +x /usr/local/bin/docker-compose
+   ```
+
+2. **Quick Start**:
+   ```bash
+   # Clone the repository
+   git clone https://github.com/MaximCincinnatis/PulseChain-Ethereum-Node-Suite.git
+   cd PulseChain-Ethereum-Node-Suite
+
+   # Start the interactive setup
+   ./start-with-docker-compose.sh
+   ```
+
+3. **Manual Configuration** (Optional):
+   ```bash
+   # Copy the environment file
+   cp .env.example .env
+
+   # Edit the configuration
+   nano .env
+
+   # Start the services
+   docker-compose up -d
+   ```
+
+4. **Access Your Node**:
+   - Execution Client RPC: http://localhost:8545
+   - Consensus Client API: http://localhost:5052
+   - Monitoring Dashboard: http://localhost:3000 (admin/admin)
+
+### Option 2: Traditional Installation
+
 ### One-Command Installation
 
 Choose ONLY ONE of these options:
@@ -375,3 +419,77 @@ Expect future updates to improve stability, performance, and add features.
 ## 📣 Feedback and Contributions
 
 Feedback on this alpha release is welcome. Please report issues or suggestions through GitHub issues.
+
+## 🐳 Docker Compose Management
+
+### Basic Commands
+
+```bash
+# Start all services
+docker-compose up -d
+
+# Stop all services
+docker-compose down
+
+# View logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f execution  # For execution client
+docker-compose logs -f consensus  # For consensus client
+
+# Check service status
+docker-compose ps
+
+# Restart specific service
+docker-compose restart execution  # For execution client
+docker-compose restart consensus  # For consensus client
+```
+
+### Configuration
+
+The setup uses two main configuration files:
+
+1. `.env`: Environment variables for customizing your setup
+   ```ini
+   # Network Selection
+   NETWORK=pulsechain  # or ethereum
+
+   # Client Selection
+   EXECUTION_CLIENT=geth  # or erigon
+   CONSENSUS_CLIENT=lighthouse  # or prysm
+
+   # Resource Limits
+   EXECUTION_CPU_LIMIT=4
+   EXECUTION_MEMORY_LIMIT=8G
+   ```
+
+2. `docker-compose.yml`: Service definitions and container configurations
+
+### Data Directories
+
+Docker Compose setup uses the following directory structure:
+```
+PulseChain-Ethereum-Node-Suite/
+├── chaindata/              # Execution client data
+│   ├── pulsechain/
+│   └── ethereum/
+├── beacondata/            # Consensus client data
+│   ├── pulsechain/
+│   └── ethereum/
+├── monitoring/            # Monitoring data
+│   ├── prometheus/
+│   └── grafana/
+└── config/               # Client configurations
+```
+
+### Monitoring
+
+The Docker Compose setup includes:
+- Prometheus for metrics collection
+- Grafana for visualization
+- Pre-configured dashboards for node monitoring
+
+Access the monitoring dashboard at http://localhost:3000 with:
+- Username: admin
+- Password: admin
