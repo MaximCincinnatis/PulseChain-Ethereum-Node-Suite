@@ -6,8 +6,8 @@ A professional-grade node installation suite that supports both PulseChain and E
 
 ```bash
 # Clone the repository
-git clone https://github.com/MaximCincinnatis/PulseChain-Full-Node-Suite.git
-cd PulseChain-Full-Node-Suite
+git clone https://github.com/MaximCincinnatis/PulseChain-Ethereum-Node-Suite.git
+cd PulseChain-Ethereum-Node-Suite
 
 # Make the setup script executable
 chmod +x setup.sh
@@ -213,7 +213,7 @@ Or if you prefer step by step:
 
 ```bash
 # Clone the repository
-git clone https://github.com/MaximCincinnatis/PulseChain-Ethereum-Node-Suite
+git clone https://github.com/MaximCincinnatis/PulseChain-Ethereum-Node-Suite.git
 cd PulseChain-Ethereum-Node-Suite
 
 # Start the setup (will install Docker if needed)
@@ -237,7 +237,7 @@ Or manually:
 
 1. **Clone and Enter Directory**:
    ```bash
-   git clone https://github.com/MaximCincinnatis/PulseChain-Ethereum-Node-Suite
+   git clone https://github.com/MaximCincinnatis/PulseChain-Ethereum-Node-Suite.git
    cd PulseChain-Ethereum-Node-Suite
    ```
 
