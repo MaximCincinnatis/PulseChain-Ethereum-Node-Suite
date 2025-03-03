@@ -1,5 +1,116 @@
 # Blockchain Node Suite - PulseChain & Ethereum
 
+A professional-grade node installation suite that supports both PulseChain and Ethereum networks. Choose your preferred network and installation method during setup.
+
+## Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/MaximCincinnatis/PulseChain-Full-Node-Suite.git
+cd PulseChain-Full-Node-Suite
+
+# Make the setup script executable
+chmod +x setup.sh
+
+# Run the setup script
+./setup.sh
+```
+
+The setup script will guide you through the installation process:
+1. Check system requirements
+2. Choose your installation method (Docker Compose or Traditional)
+3. Select your preferred network (PulseChain or Ethereum)
+4. Configure your node settings
+
+## System Requirements
+
+- CPU: 4+ cores (8+ recommended)
+- RAM: 16GB minimum (32GB recommended)
+- Storage: 2TB+ SSD/NVMe
+- Internet: 25+ Mbps connection
+- Operating System: Ubuntu 20.04+ / Debian 11+ / Windows 10/11 with WSL2
+
+## Installation Methods
+
+### Docker Compose (Recommended)
+- Simplified installation and management
+- Automatic updates and dependency handling
+- Built-in monitoring with Grafana/Prometheus
+- Easy backup and restore
+
+### Traditional Installation
+- Direct system installation
+- Manual control over all components
+- Lower resource overhead
+- Advanced customization options
+
+## Network Support
+
+### PulseChain
+- Chain ID: 943
+- Native token: PLS
+- Block time: 2 seconds
+- Consensus: Proof of Stake
+
+### Ethereum
+- Chain ID: 1
+- Native token: ETH
+- Block time: 12 seconds
+- Consensus: Proof of Stake
+
+## Client Options
+
+### Execution Clients
+- Geth (Recommended)
+- Nethermind
+
+### Consensus Clients
+- Prysm (Recommended)
+- Lighthouse
+
+## Monitoring & Management
+
+Access your node's dashboard at http://localhost:3000 after installation.
+- View sync status
+- Monitor system resources
+- Check client health
+- View network statistics
+
+## Configuration
+
+The setup process will create a `.env` file with your selected options. You can modify these settings at any time:
+- Network selection
+- Client choices
+- Port configurations
+- Resource limits
+- Monitoring options
+
+## Troubleshooting
+
+If you encounter issues:
+1. Check the logs: `docker-compose logs -f` (Docker) or `journalctl -u nodename` (Traditional)
+2. Verify system requirements
+3. Ensure ports are open (8545, 5052, 3000)
+4. Check disk space and permissions
+
+## Support
+
+- GitHub Issues: Report bugs and request features
+- Documentation: Detailed guides in the `docs` directory
+- Community: Join our Discord for support
+
+## Contributing
+
+We welcome contributions! Please see `CONTRIBUTING.md` for guidelines.
+
+## Security
+
+For security concerns, please see `SECURITY.md`.
+
+## License
+
+This project is licensed under the MIT License - see the `LICENSE` file for details.
+
 ## ⚠️ ALPHA RELEASE WARNING (v0.1.1) ⚠️
 
 **This is an ALPHA release intended for testing and development purposes only.**
@@ -89,106 +200,57 @@ This architecture ensures reliability through error detection, recovery mechanis
 
 ## 📥 Installation Options
 
-### ⚠️ Important: Network Selection
-You must choose ONE network during installation. This choice cannot be changed without a complete reinstallation:
-
-Choose EITHER:
-```bash
-# For PulseChain setup
-./setup_pulse_node.sh
-```
-OR:
-```bash
-# For Ethereum setup
-./setup_eth_node.sh
-```
-
 ### Option 1: Docker Compose (Recommended)
 
-This is the easiest way to get started. Docker Compose manages all components automatically.
+The setup script will automatically install Docker and Docker Compose if they're not present.
 
-1. **Prerequisites**:
-   ```bash
-   # Install Docker
-   curl -fsSL https://get.docker.com -o get-docker.sh
-   sudo sh get-docker.sh
+```bash
+# One-command installation
+curl -s https://raw.githubusercontent.com/MaximCincinnatis/PulseChain-Ethereum-Node-Suite/main/start-with-docker-compose.sh | sudo bash
+```
 
-   # Install Docker Compose
-   sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-   sudo chmod +x /usr/local/bin/docker-compose
-   ```
+Or if you prefer step by step:
 
-2. **Quick Start**:
-   ```bash
-   # Clone the repository
-   git clone https://github.com/MaximCincinnatis/PulseChain-Ethereum-Node-Suite.git
-   cd PulseChain-Ethereum-Node-Suite
+```bash
+# Clone the repository
+git clone https://github.com/MaximCincinnatis/PulseChain-Ethereum-Node-Suite
+cd PulseChain-Ethereum-Node-Suite
 
-   # Start the interactive setup
-   ./start-with-docker-compose.sh
-   ```
+# Start the setup (will install Docker if needed)
+./start-with-docker-compose.sh
+```
 
-3. **Manual Configuration** (Optional):
-   ```bash
-   # Copy the environment file
-   cp .env.example .env
-
-   # Edit the configuration
-   nano .env
-
-   # Start the services
-   docker-compose up -d
-   ```
-
-4. **Access Your Node**:
-   - Execution Client RPC: http://localhost:8545
-   - Consensus Client API: http://localhost:5052
-   - Monitoring Dashboard: http://localhost:3000 (admin/admin)
+The script will:
+1. Install Docker and Docker Compose if not present
+2. Guide you through network selection (PulseChain or Ethereum)
+3. Set up your chosen client configuration
+4. Start all services automatically
 
 ### Option 2: Traditional Installation
 
-### One-Command Installation
-
-Choose ONLY ONE of these options:
-
-For PulseChain:
 ```bash
-sudo apt update && sudo apt install git -y && git clone https://github.com/MaximCincinnatis/PulseChain-Full-Node-Suite && cd PulseChain-Full-Node-Suite && chmod +x setup_pulse_node.sh && ./setup_pulse_node.sh
+# One-command installation
+curl -s https://raw.githubusercontent.com/MaximCincinnatis/PulseChain-Ethereum-Node-Suite/main/setup.sh | sudo bash
 ```
 
-OR for Ethereum:
-```bash
-sudo apt update && sudo apt install git -y && git clone https://github.com/MaximCincinnatis/PulseChain-Full-Node-Suite && cd PulseChain-Full-Node-Suite && chmod +x setup_eth_node.sh && ./setup_eth_node.sh
-```
+Or manually:
 
-### Manual Installation Steps
-
-1. **Install Git**:
+1. **Clone and Enter Directory**:
    ```bash
-   sudo apt update && sudo apt install git -y
+   git clone https://github.com/MaximCincinnatis/PulseChain-Ethereum-Node-Suite
+   cd PulseChain-Ethereum-Node-Suite
    ```
 
-2. **Clone the repository**:
+2. **Run Setup**:
    ```bash
-   git clone https://github.com/MaximCincinnatis/PulseChain-Full-Node-Suite
+   ./setup.sh
    ```
 
-3. **Enter the directory**:
-   ```bash
-   cd PulseChain-Full-Node-Suite
-   ```
-
-4. **Make the setup script executable**:
-   ```bash
-   chmod +x setup_pulse_node.sh
-   ```
-
-5. **Run the setup script**:
-   ```bash
-   ./setup_pulse_node.sh
-   ```
-
-6. **Follow the interactive prompts** to complete your installation
+The setup script will:
+1. Install all required dependencies
+2. Guide you through network selection
+3. Configure your chosen clients
+4. Set up monitoring
 
 ## 🔍 Key Features Explained
 

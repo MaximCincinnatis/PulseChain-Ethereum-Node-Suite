@@ -3,109 +3,108 @@
 # Colors for output
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}PulseChain/Ethereum Node Setup with Docker Compose${NC}"
-echo "=================================================="
+echo -e "${GREEN}Docker Compose Setup${NC}"
+echo "===================="
 
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}Docker is not installed. Please install Docker first.${NC}"
-    exit 1
-fi
+# Function to select network
+select_network() {
+    echo -e "\n${GREEN}Select Network:${NC}"
+    echo "1) PulseChain"
+    echo "2) Ethereum"
+    read -p "Enter your choice (1/2): " network_choice
 
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
-    echo -e "${RED}Docker Compose is not installed. Please install Docker Compose first.${NC}"
-    exit 1
-fi
+    case $network_choice in
+        1)
+            cp .env.example .env
+            sed -i 's/NETWORK_TYPE=.*/NETWORK_TYPE=pulsechain/' .env
+            sed -i 's/CHAIN_ID=.*/CHAIN_ID=943/' .env
+            ;;
+        2)
+            cp .env.example .env
+            sed -i 's/NETWORK_TYPE=.*/NETWORK_TYPE=ethereum/' .env
+            sed -i 's/CHAIN_ID=.*/CHAIN_ID=1/' .env
+            ;;
+        *)
+            echo -e "${RED}Invalid choice. Exiting.${NC}"
+            exit 1
+            ;;
+    esac
+}
 
-# Create necessary directories
-echo "Creating required directories..."
-mkdir -p chaindata/{pulsechain,ethereum}
-mkdir -p beacondata/{pulsechain,ethereum}
-mkdir -p monitoring/{prometheus,grafana}
-mkdir -p config
-
-# Copy environment file if it doesn't exist
-if [ ! -f .env ]; then
-    echo "Creating .env file from template..."
-    cp .env.example .env
-    echo "Please edit .env file to customize your setup"
-fi
-
-# Network selection
-echo ""
-echo "Please select your network:"
-echo "1) PulseChain"
-echo "2) Ethereum"
-read -p "Enter your choice (1/2): " network_choice
-
-case $network_choice in
-    1)
-        sed -i 's/NETWORK=.*/NETWORK=pulsechain/' .env
-        ;;
-    2)
-        sed -i 's/NETWORK=.*/NETWORK=ethereum/' .env
-        ;;
-    *)
-        echo -e "${RED}Invalid choice. Exiting.${NC}"
+# Function to check Docker status
+check_docker_status() {
+    echo -e "\n${GREEN}Checking Docker status...${NC}"
+    
+    if ! docker info > /dev/null 2>&1; then
+        echo -e "${RED}Docker is not running. Please start Docker and try again.${NC}"
         exit 1
-        ;;
-esac
+    fi
+    
+    echo "Docker is running"
+}
 
-# Client selection
-echo ""
-echo "Please select your execution client:"
-echo "1) Geth"
-echo "2) Erigon"
-read -p "Enter your choice (1/2): " execution_choice
+# Function to create data directories
+create_directories() {
+    echo -e "\n${GREEN}Creating data directories...${NC}"
+    
+    mkdir -p data/execution
+    mkdir -p data/consensus
+    mkdir -p data/monitoring/grafana
+    mkdir -p data/monitoring/prometheus
+    
+    echo "Data directories created successfully"
+}
 
-case $execution_choice in
-    1)
-        sed -i 's/EXECUTION_CLIENT=.*/EXECUTION_CLIENT=geth/' .env
-        sed -i 's/EXECUTION_CLIENT_IMAGE=.*/EXECUTION_CLIENT_IMAGE=ethereum\/client-go:latest/' .env
-        ;;
-    2)
-        sed -i 's/EXECUTION_CLIENT=.*/EXECUTION_CLIENT=erigon/' .env
-        sed -i 's/EXECUTION_CLIENT_IMAGE=.*/EXECUTION_CLIENT_IMAGE=thorax\/erigon:latest/' .env
-        ;;
-    *)
-        echo -e "${RED}Invalid choice. Using default (Geth)${NC}"
-        ;;
-esac
+# Function to pull Docker images
+pull_images() {
+    echo -e "\n${GREEN}Pulling Docker images...${NC}"
+    docker-compose pull
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to pull Docker images. Please check your internet connection and try again.${NC}"
+        exit 1
+    fi
+    
+    echo "Docker images pulled successfully"
+}
 
-echo ""
-echo "Please select your consensus client:"
-echo "1) Lighthouse"
-echo "2) Prysm"
-read -p "Enter your choice (1/2): " consensus_choice
+# Function to start services
+start_services() {
+    echo -e "\n${GREEN}Starting services...${NC}"
+    docker-compose up -d
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to start services. Please check the logs for more information.${NC}"
+        exit 1
+    fi
+    
+    echo -e "Services started successfully"
+}
 
-case $consensus_choice in
-    1)
-        sed -i 's/CONSENSUS_CLIENT=.*/CONSENSUS_CLIENT=lighthouse/' .env
-        sed -i 's/CONSENSUS_CLIENT_IMAGE=.*/CONSENSUS_CLIENT_IMAGE=sigp\/lighthouse:latest/' .env
-        ;;
-    2)
-        sed -i 's/CONSENSUS_CLIENT=.*/CONSENSUS_CLIENT=prysm/' .env
-        sed -i 's/CONSENSUS_CLIENT_IMAGE=.*/CONSENSUS_CLIENT_IMAGE=gcr.io\/prysmaticlabs\/prysm\/beacon-chain:latest/' .env
-        ;;
-    *)
-        echo -e "${RED}Invalid choice. Using default (Lighthouse)${NC}"
-        ;;
-esac
+# Function to display service status
+show_status() {
+    echo -e "\n${GREEN}Service Status:${NC}"
+    docker-compose ps
+    
+    echo -e "\n${YELLOW}Useful Commands:${NC}"
+    echo "- View logs: docker-compose logs -f"
+    echo "- Stop services: docker-compose down"
+    echo "- Restart services: docker-compose restart"
+    echo -e "\n${YELLOW}Access Points:${NC}"
+    echo "- Execution Client RPC: http://localhost:8545"
+    echo "- Consensus Client API: http://localhost:5052"
+    echo "- Monitoring Dashboard: http://localhost:3000"
+}
 
-# Start the services
-echo ""
-echo -e "${GREEN}Starting services with Docker Compose...${NC}"
-docker-compose up -d
+# Main setup flow
+check_docker_status
+select_network
+create_directories
+pull_images
+start_services
+show_status
 
-# Show running containers
-echo ""
-echo "Running containers:"
-docker-compose ps
-
-echo ""
-echo -e "${GREEN}Setup complete!${NC}"
-echo "Monitor your node at http://localhost:3000 (Grafana)"
-echo "Default credentials: admin/admin" 
+echo -e "\n${GREEN}Setup completed successfully!${NC}" 
