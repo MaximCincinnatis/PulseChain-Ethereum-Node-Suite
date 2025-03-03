@@ -1,21 +1,41 @@
 #!/bin/bash
 
+# Get the selected network from environment or use default
+SELECTED_NETWORK="${SELECTED_NETWORK:-pulsechain}"
+
+# Network-specific parameters
+declare -A GENESIS_TIME
+GENESIS_TIME["pulsechain"]=1683785555  # PulseChain genesis time
+GENESIS_TIME["ethereum"]=1606824023     # Ethereum genesis time
+
+declare -A SLOT_TIME
+SLOT_TIME["pulsechain"]=12  # PulseChain slot time in seconds
+SLOT_TIME["ethereum"]=12    # Ethereum slot time in seconds
+
+declare -A NETWORK_NAME
+NETWORK_NAME["pulsechain"]="PulseChain"
+NETWORK_NAME["ethereum"]="Ethereum"
+
 # Functions
-epoch_to_time(){
-    expr 1683785555 + \( $1 \* 320 \)
+epoch_to_time() {
+    local network_genesis=${GENESIS_TIME[$SELECTED_NETWORK]}
+    local slot_time=${SLOT_TIME[$SELECTED_NETWORK]}
+    expr $network_genesis + \( $1 \* \( 32 \* $slot_time \) \)
 }
 
-time_to_epoch(){
-    expr \( $1 - 1683785555 \) / 320
+time_to_epoch() {
+    local network_genesis=${GENESIS_TIME[$SELECTED_NETWORK]}
+    local slot_time=${SLOT_TIME[$SELECTED_NETWORK]}
+    expr \( $1 - $network_genesis \) / \( 32 \* $slot_time \)
 }
 
-display_epoch(){
+display_epoch() {
     echo "epoch: $1 : $(date -d@$(epoch_to_time $1)) <-- $2"
 }
 
 # Main script
-echo "PulseChain Node Sync Status Check"
-echo "================================="
+echo "${NETWORK_NAME[$SELECTED_NETWORK]} Node Sync Status Check"
+echo "=================================================="
 echo ""
 
 # Get local epoch from the beacon node
@@ -41,6 +61,7 @@ fi
 
 BEACON_NODE="${BEACON_NODE}:${BEACON_PORT}"
 echo "Using beacon node at: ${BEACON_NODE}"
+echo "Network: ${NETWORK_NAME[$SELECTED_NETWORK]}"
 echo ""
 
 # Get current finalized epoch
@@ -66,16 +87,68 @@ echo ""
 
 # Check if execution client is synced
 if docker ps | grep -q "execution"; then
-    EXEC_SYNCED=$(curl -s -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_syncing","params":[],"id":1}' http://localhost:8545 | jq .result)
+    # Get network-specific chain ID
+    CHAIN_ID=$(curl -s -X POST -H "Content-Type: application/json" \
+        --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+        http://localhost:8545 | jq -r .result)
+    
+    # Verify chain ID
+    EXPECTED_CHAIN_ID=""
+    case $SELECTED_NETWORK in
+        "pulsechain")
+            EXPECTED_CHAIN_ID="0x3af"  # 943 in hex
+            ;;
+        "ethereum")
+            EXPECTED_CHAIN_ID="0x1"    # 1 in hex
+            ;;
+    esac
+    
+    if [ "$CHAIN_ID" != "$EXPECTED_CHAIN_ID" ]; then
+        echo "Warning: Connected to wrong network!"
+        echo "Expected chain ID: $EXPECTED_CHAIN_ID (${NETWORK_NAME[$SELECTED_NETWORK]})"
+        echo "Connected to chain ID: $CHAIN_ID"
+        echo ""
+    fi
+    
+    EXEC_SYNCED=$(curl -s -X POST -H "Content-Type: application/json" \
+        --data '{"jsonrpc":"2.0","method":"eth_syncing","params":[],"id":1}' \
+        http://localhost:8545 | jq .result)
     if [ "$EXEC_SYNCED" == "false" ]; then
         echo "Execution client is fully synced."
     else
         echo "Execution client is still syncing."
+        # Get detailed sync status
+        SYNC_STATUS=$(curl -s -X POST -H "Content-Type: application/json" \
+            --data '{"jsonrpc":"2.0","method":"eth_syncing","params":[],"id":1}' \
+            http://localhost:8545)
+        CURRENT_BLOCK=$(echo $SYNC_STATUS | jq -r '.result.currentBlock // "0x0"')
+        HIGHEST_BLOCK=$(echo $SYNC_STATUS | jq -r '.result.highestBlock // "0x0"')
+        echo "Current block: $((16#${CURRENT_BLOCK#0x}))"
+        echo "Highest block: $((16#${HIGHEST_BLOCK#0x}))"
+        PROGRESS=$(echo "scale=2; $((16#${CURRENT_BLOCK#0x})) * 100 / $((16#${HIGHEST_BLOCK#0x}))" | bc)
+        echo "Sync progress: ${PROGRESS}%"
     fi
 fi
 
 echo ""
 echo "Sync check complete."
+
+# Network-specific troubleshooting tips
+echo ""
+echo "Troubleshooting Tips for ${NETWORK_NAME[$SELECTED_NETWORK]}:"
+case $SELECTED_NETWORK in
+    "pulsechain")
+        echo "1. Check PulseChain block explorer: https://scan.pulsechain.com"
+        echo "2. Verify your node against PulseChain checkpoint: https://checkpoint.pulsechain.com"
+        echo "3. PulseChain RPC status: https://rpc.pulsechain.com"
+        ;;
+    "ethereum")
+        echo "1. Check Ethereum block explorer: https://etherscan.io"
+        echo "2. Verify your node against Ethereum checkpoint: https://beaconcha.in"
+        echo "3. Check Ethereum network status: https://ethstats.net"
+        ;;
+esac
+echo ""
 
 echo "Press [Enter] to exit..."
 read

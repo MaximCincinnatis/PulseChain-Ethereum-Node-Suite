@@ -1,8 +1,32 @@
 #!/bin/bash
 
-# PulseChain Node Verification Script
-# This script runs a comprehensive verification of the PulseChain node setup
-# It tests connectivity, container health, and API functionality
+# Blockchain Node Verification Script
+# This script runs a comprehensive verification of the node setup
+# Supports both PulseChain and Ethereum networks
+
+# Get the selected network from environment or use default
+SELECTED_NETWORK="${SELECTED_NETWORK:-pulsechain}"
+
+# Network-specific parameters
+declare -A NETWORK_NAME
+NETWORK_NAME["pulsechain"]="PulseChain"
+NETWORK_NAME["ethereum"]="Ethereum"
+
+declare -A NETWORK_CHAIN_ID
+NETWORK_CHAIN_ID["pulsechain"]="943"
+NETWORK_CHAIN_ID["ethereum"]="1"
+
+declare -A NETWORK_CHECKPOINT
+NETWORK_CHECKPOINT["pulsechain"]="checkpoint.pulsechain.com"
+NETWORK_CHECKPOINT["ethereum"]="beaconcha.in"
+
+declare -A NETWORK_EXPLORER
+NETWORK_EXPLORER["pulsechain"]="scan.pulsechain.com"
+NETWORK_EXPLORER["ethereum"]="etherscan.io"
+
+declare -A NETWORK_BOOTNODE
+NETWORK_BOOTNODE["pulsechain"]="boot.pulsechain.com"
+NETWORK_BOOTNODE["ethereum"]="boot.ethereum.org"
 
 # Determine script location and source helper functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,15 +39,20 @@ if [[ -z "$CUSTOM_PATH" ]]; then
 fi
 
 init_logging "$CUSTOM_PATH"
-log_info "Starting node verification using verify_node.sh"
+log_info "Starting ${NETWORK_NAME[$SELECTED_NETWORK]} node verification using verify_node.sh"
 
 # Set up standardized error handling
 setup_error_handling
 
 # Verify system requirements before proceeding
 log_info "Checking system requirements"
-check_disk_space 5 "$CUSTOM_PATH"  # Require at least 5GB free space
-check_memory 2                     # Require at least 2GB RAM
+# Adjust disk space requirements based on network
+if [ "$SELECTED_NETWORK" = "ethereum" ]; then
+    check_disk_space 10 "$CUSTOM_PATH"  # Require at least 10GB free space for Ethereum
+else
+    check_disk_space 5 "$CUSTOM_PATH"   # Require at least 5GB free space for PulseChain
+fi
+check_memory 4                          # Require at least 4GB RAM
 
 # Determine client types from running containers
 EXECUTION_CLIENT=""
@@ -61,7 +90,8 @@ if [[ -z "$EXECUTION_CLIENT" || -z "$CONSENSUS_CLIENT" ]]; then
     exit 1
 fi
 
-echo -e "${GREEN}Detected clients:${NC}"
+echo -e "${GREEN}Detected configuration:${NC}"
+echo "Network: ${NETWORK_NAME[$SELECTED_NETWORK]}"
 echo "Execution client: $EXECUTION_CLIENT"
 echo "Consensus client: $CONSENSUS_CLIENT"
 echo ""
@@ -74,19 +104,47 @@ if [[ "$DETAILED" == "-v" || "$DETAILED" == "--verbose" ]]; then
 fi
 
 # Check network connectivity before proceeding
-check_network_connectivity "8.8.8.8" 53 5
+check_network_connectivity "${NETWORK_CHECKPOINT[$SELECTED_NETWORK]}" 443 5
 
-echo -e "${GREEN}Running node verification...${NC}"
+echo -e "${GREEN}Running ${NETWORK_NAME[$SELECTED_NETWORK]} node verification...${NC}"
 echo "This may take a moment. Please wait."
 echo ""
+
+# Verify chain ID
+echo "Verifying chain ID..."
+CHAIN_ID=$(curl -s -X POST -H "Content-Type: application/json" \
+    --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+    http://localhost:8545 | jq -r '.result')
+
+if [ -n "$CHAIN_ID" ]; then
+    CHAIN_ID_DEC=$((16#${CHAIN_ID:2}))
+    if [ "$CHAIN_ID_DEC" = "${NETWORK_CHAIN_ID[$SELECTED_NETWORK]}" ]; then
+        echo -e "${GREEN}Chain ID verified: $CHAIN_ID_DEC${NC}"
+    else
+        echo -e "${RED}Error: Wrong chain ID detected!${NC}"
+        echo "Expected: ${NETWORK_CHAIN_ID[$SELECTED_NETWORK]}"
+        echo "Found: $CHAIN_ID_DEC"
+        exit 1
+    fi
+else
+    echo -e "${RED}Error: Could not verify chain ID${NC}"
+    exit 1
+fi
 
 # Verify node setup (extracted from functions.sh)
 if verify_node_setup "$EXECUTION_CLIENT" "$CONSENSUS_CLIENT" "$DETAILED"; then
     log_info "Node verification completed successfully"
     echo -e "${GREEN}Node verification completed successfully!${NC}"
     echo ""
-    echo "Your PulseChain node (non-validator) appears to be correctly set up and running."
-    echo "You can now safely use your node for connecting to the PulseChain network."
+    echo "Your ${NETWORK_NAME[$SELECTED_NETWORK]} node (non-validator) appears to be correctly set up and running."
+    echo "You can now safely use your node for connecting to the ${NETWORK_NAME[$SELECTED_NETWORK]} network."
+    
+    # Display network-specific information
+    echo ""
+    echo -e "${GREEN}Network Resources:${NC}"
+    echo "1. Block Explorer: https://${NETWORK_EXPLORER[$SELECTED_NETWORK]}"
+    echo "2. Checkpoint Sync: https://${NETWORK_CHECKPOINT[$SELECTED_NETWORK]}"
+    echo "3. Boot Node: ${NETWORK_BOOTNODE[$SELECTED_NETWORK]}"
 else
     log_error "Node verification completed with issues"
     echo -e "${YELLOW}Node verification completed with some issues.${NC}"
@@ -100,7 +158,7 @@ else
     echo "   sudo docker logs beacon"
     
     echo "2. Verify network connectivity:"
-    echo "   ping checkpoint.pulsechain.com"
+    echo "   ping ${NETWORK_CHECKPOINT[$SELECTED_NETWORK]}"
     echo "   - Check firewall settings: sudo ufw status"
     
     echo "3. Ensure you have the latest client versions:"
@@ -108,6 +166,10 @@ else
     
     echo "4. Check disk space:"
     echo "   df -h"
+    
+    echo "5. Verify network configuration:"
+    echo "   - Check if you're connected to the right network (Chain ID: ${NETWORK_CHAIN_ID[$SELECTED_NETWORK]})"
+    echo "   - Verify your client configurations match your selected network"
 fi
 
 echo ""
