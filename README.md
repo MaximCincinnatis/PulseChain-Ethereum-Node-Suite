@@ -1,4 +1,4 @@
-# PulseChain Full Node Suite - Non-Validator Edition
+# Blockchain Node Suite - Single Network Installation
 
 ## ⚠️ ALPHA RELEASE WARNING (v0.1.1) ⚠️
 
@@ -8,26 +8,43 @@
 
 This package has been specifically modified to **remove all validator functionality**. It cannot be used for validation or staking.
 
+## ⚠️ Important Note on Network Selection
+
+**You must choose EITHER PulseChain OR Ethereum for your node installation. Running both networks simultaneously is not supported.**
+
 ## 📋 Quick Summary
 
-* **Purpose**: Setup and manage a PulseChain full node (without validator functionality)
+* **Purpose**: Setup and manage EITHER a PulseChain OR Ethereum full node (without validator functionality)
+* **Network Choice**: Must select one network during installation - cannot run both simultaneously
 * **Status**: Alpha release - may contain bugs or incomplete features
 * **Recommended for**: Testing, development, and RPC endpoint provisioning
 * **Not recommended for**: Production environments without thorough testing
-* **Key components**: Execution client (Geth/Erigon), Consensus client (Lighthouse/Prysm), Monitoring (Prometheus/Grafana)
-* **Management**: Interactive menu system (`plsmenu`) for all node operations
+* **Key components**: 
+  - Execution clients (choose one network): 
+    * PulseChain: Geth/Erigon
+    * OR
+    * Ethereum: Geth/Erigon
+  - Consensus clients (choose one network):
+    * PulseChain: Lighthouse/Prysm
+    * OR
+    * Ethereum: Lighthouse/Prysm
+  - Monitoring: Prometheus/Grafana
+* **Management**: Interactive menu system for node operations
+* **Network Selection**: One-time choice between PulseChain and Ethereum
 * **Network Optimization**: Switchable modes for local or public RPC usage
 * **Robust Configuration**: JSON-based central configuration system for easy customization
 * **Sync Recovery**: Advanced recovery mechanisms for blockchain synchronization issues
 
 ## 🏗️ System Architecture
 
-The PulseChain Full Node Suite follows a modular design with these key components:
+The Node Suite follows a modular design with these key components:
 
-1. **Main Setup Script**: `setup_pulse_node.sh` handles the initial installation and configuration
+1. **Main Setup Scripts**: 
+   - `setup_pulse_node.sh` for PulseChain setup
+   - `setup_eth_node.sh` for Ethereum setup
 2. **Helper Scripts**: Various scripts in the `helper/` directory provide specialized functionality
 3. **Centralized Configuration**: JSON-based config system for easy management
-4. **Menu Interface**: The `plsmenu` command provides a user-friendly management UI
+4. **Menu Interface**: User-friendly management UI with network-specific options
 5. **Monitoring Stack**: Prometheus and Grafana with custom dashboards
 6. **Recovery Subsystems**: Smart restart and sync recovery mechanisms
 7. **Health Management**: Automated resource monitoring with protective actions
@@ -36,6 +53,10 @@ This architecture ensures reliability through error detection, recovery mechanis
 
 ## 🛠️ What This Package Does
 
+* **Network Support**: 
+  - Full PulseChain node setup and management
+  - Full Ethereum node setup and management
+  - Easy switching between networks
 * **System Preparation**: Installs dependencies (Docker, system packages) and optimizes performance
 * **Node Deployment**: Sets up execution and consensus clients as Docker containers
 * **Configuration Management**: Manages node settings through a centralized system
@@ -48,25 +69,52 @@ This architecture ensures reliability through error detection, recovery mechanis
 
 ## ❌ What This Package Does NOT Do
 
-* **No Validator Functionality**: Cannot be used for staking or validation
+* **No Validator Functionality**: Cannot be used for staking or validation on either network
 * **No Key Management**: Does not handle validator keys or deposits
 * **No Staking Rewards**: Cannot earn rewards from validating blocks
 * **No Validator Monitoring**: No validator performance metrics
 
 ## 💻 System Requirements
 
+### General Requirements
 * Ubuntu 20.04 LTS or newer
 * At least 16GB RAM (32GB recommended)
-* Minimum 2TB SSD (NVMe SSD recommended)
 * Stable internet connection (10Mbps+ upload/download)
 * Modern CPU with 4+ cores
 
+### Storage Requirements
+* PulseChain Full Node: Minimum 2TB SSD (NVMe SSD recommended)
+* Ethereum Full Node: Minimum 4TB SSD (NVMe SSD recommended)
+* Archive Node (either network): Additional storage required
+
 ## 📥 Installation Options
+
+### ⚠️ Important: Network Selection
+You must choose ONE network during installation. This choice cannot be changed without a complete reinstallation:
+
+Choose EITHER:
+```bash
+# For PulseChain setup
+./setup_pulse_node.sh
+```
+OR:
+```bash
+# For Ethereum setup
+./setup_eth_node.sh
+```
 
 ### One-Command Installation
 
+Choose ONLY ONE of these options:
+
+For PulseChain:
 ```bash
 sudo apt update && sudo apt install git -y && git clone https://github.com/MaximCincinnatis/PulseChain-Full-Node-Suite && cd PulseChain-Full-Node-Suite && chmod +x setup_pulse_node.sh && ./setup_pulse_node.sh
+```
+
+OR for Ethereum:
+```bash
+sudo apt update && sudo apt install git -y && git clone https://github.com/MaximCincinnatis/PulseChain-Full-Node-Suite && cd PulseChain-Full-Node-Suite && chmod +x setup_eth_node.sh && ./setup_eth_node.sh
 ```
 
 ### Manual Installation Steps

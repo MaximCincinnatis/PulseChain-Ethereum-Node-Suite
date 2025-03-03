@@ -516,100 +516,78 @@ node_info_submenu() {
 
 system_submenu() {
     while true; do
-        system_opt=$(dialog --stdout --title "System Menu $VERSION" --backtitle "PulseChain Node Management" --menu "System maintenance options:" 0 0 0 \
-                         "Update System" "Update Ubuntu packages" \
-                         "Docker Maintenance" "Prune unused Docker resources" \
-                         "Backup Configuration" "Create backup of node configuration" \
-                         "Reboot System" "Safely reboot the server" \
-                         "Shutdown System" "Safely shut down the server" \
-                         "BACK" "Return to the Main Menu")
+        # Check for updates before showing menu
+        if [ -f "/blockchain/updates/indicator" ]; then
+            update_indicator="🔔 Updates Available"
+        else
+            update_indicator="✓ Up to date"
+        fi
+        
+        sys_opt=$(dialog --stdout --title "System Menu $VERSION" --backtitle "PulseChain Node Management" --menu "System maintenance and updates ($update_indicator):" 0 0 0 \
+                      "Check Updates" "Check for available updates" \
+                      "Update Node" "View and apply available updates" \
+                      "Update History" "View update history" \
+                      "System Status" "View system resource usage" \
+                      "Disk Usage" "Check disk space usage" \
+                      "Network Info" "View network configuration" \
+                      "BACK" "Return to the Main Menu")
 
         case $? in
           0)
-            case $system_opt in
-                "Update System")
-                    show_header "System Updates"
-                    echo "Running system updates..."
-                    echo "Updating package lists..."
-                    sudo apt-get update
-                    
+            case $sys_opt in
+                "Check Updates")
+                    show_header "Check Updates"
+                    source /blockchain/helper/updates/update_manager.sh
+                    check_for_updates
+                    pause
+                    ;;
+                "Update Node")
+                    show_header "Update Node"
+                    source /blockchain/helper/updates/update_manager.sh
+                    if [ -f "/blockchain/updates/available_updates.json" ]; then
+                        echo "📦 Available Updates:"
+                        echo "-------------------"
+                        jq -r '.message' /blockchain/updates/available_updates.json
+                        echo ""
+                        echo "⚠️  Before updating:"
+                        echo "- A backup will be created automatically"
+                        echo "- Both beacon and execution clients will need to restart"
+                        echo "- This may take several minutes"
+                        echo ""
+                        read -p "Would you like to proceed with the update? (y/N): " confirm
+                        if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+                            perform_update
+                        fi
+                    else
+                        echo "No updates available. Your node is up to date!"
+                    fi
+                    pause
+                    ;;
+                "Update History")
+                    show_header "Update History"
+                    source /blockchain/helper/updates/update_manager.sh
+                    show_update_history
+                    ;;
+                "System Status")
+                    show_header "System Status"
+                    top -b -n 1
+                    pause
+                    ;;
+                "Disk Usage")
+                    show_header "Disk Usage"
+                    df -h
                     echo ""
-                    read -p "Do you want to upgrade packages? (y/N): " confirm
-                    if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                        echo "Upgrading packages (this may take some time)..."
-                        sudo apt-get upgrade -y
-                        echo "System has been updated."
-                    else
-                        echo "Package upgrade skipped."
-                    fi
+                    echo "Docker volumes:"
+                    docker system df -v
                     pause
                     ;;
-                "Docker Maintenance")
-                    show_header "Docker Maintenance"
-                    echo "Checking Docker disk usage..."
-                    sudo docker system df
-                    
+                "Network Info")
+                    show_header "Network Information"
+                    ip addr show
                     echo ""
-                    read -p "Do you want to prune unused Docker resources? (y/N): " confirm
-                    if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                        echo "Pruning unused Docker resources..."
-                        sudo docker system prune -f
-                        echo "Docker cleanup completed."
-                    else
-                        echo "Docker pruning skipped."
-                    fi
+                    echo "Active connections:"
+                    netstat -tuln
                     pause
-                    ;;
-                "Backup Configuration")
-                    show_header "Backup Configuration"
-                    backup_dir="$BACKUP_PATH/config_backup_$(date +%Y%m%d_%H%M%S)"
-                    
-                    echo "Creating backup at: $backup_dir"
-                    mkdir -p "$backup_dir"
-                    
-                    # Backup configuration files
-                    cp "$CUSTOM_PATH/config.sh" "$backup_dir/" 2>/dev/null || echo "config.sh not found"
-                    cp "$CUSTOM_PATH/node_config.json" "$backup_dir/" 2>/dev/null || echo "node_config.json not found"
-                    cp "$CUSTOM_PATH/start_execution.sh" "$backup_dir/" 2>/dev/null || echo "start_execution.sh not found"
-                    cp "$CUSTOM_PATH/start_consensus.sh" "$backup_dir/" 2>/dev/null || echo "start_consensus.sh not found"
-                    
-                    # Backup helper scripts
-                    mkdir -p "$backup_dir/helper"
-                    cp -r "$HELPER_PATH/"* "$backup_dir/helper/" 2>/dev/null
-                    
-                    echo "Backup completed successfully!"
-                    echo "Backup location: $backup_dir"
-                    pause
-                    ;;
-                "Reboot System")
-                    show_header "System Reboot"
-                    echo "WARNING: This will reboot the entire system."
-                    echo "All services will be temporarily offline during reboot."
-                    read -p "Are you sure you want to reboot now? (y/N): " confirm
-                    if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                        echo "Rebooting system now..."
-                        # Give some time for user to read message
-                        sleep 2
-                        sudo reboot
-                    else
-                        echo "Reboot cancelled."
-                        pause
-                    fi
-                    ;;
-                "Shutdown System")
-                    show_header "System Shutdown"
-                    echo "WARNING: This will shut down the entire system."
-                    echo "All services will be offline until manual restart."
-                    read -p "Are you sure you want to shut down now? (y/N): " confirm
-                    if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                        echo "Shutting down system now..."
-                        # Give some time for user to read message
-                        sleep 2
-                        sudo shutdown -h now
-                    else
-                        echo "Shutdown cancelled."
-                        pause
-                    fi
                     ;;
                 "BACK")
                     break

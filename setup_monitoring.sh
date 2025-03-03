@@ -79,6 +79,24 @@ echo "==== PulseChain Monitoring Setup ===="
 echo "This script will set up Prometheus and Grafana for monitoring your Lighthouse node."
 echo ""
 
+# Add at start of script
+# Check disk space
+MIN_DISK_SPACE_GB=10
+available_space=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
+if [ "$available_space" -lt "$MIN_DISK_SPACE_GB" ]; then
+    echo -e "${RED}Error: Insufficient disk space. Need at least ${MIN_DISK_SPACE_GB}GB free.${NC}"
+    exit 1
+fi
+
+# Backup existing configs
+backup_configs() {
+    if [ -d "$config_location" ]; then
+        backup_dir="${config_location}_backup_$(date +%Y%m%d_%H%M%S)"
+        echo "Backing up existing configurations to $backup_dir"
+        cp -r "$config_location" "$backup_dir"
+    fi
+}
+
 # Create users with appropriate permissions
 echo "Adding users for prometheus and grafana"
 sudo useradd -M -G docker prometheus 2>/dev/null || echo "User prometheus already exists, skipping creation"
@@ -130,6 +148,12 @@ sudo mkdir -p "$config_location/grafana" || {
 PROMETHEUS_YML="global:
   scrape_interval: 15s
   evaluation_interval: 15s
+
+storage:
+  tsdb:
+    retention.time: 15d
+    retention.size: 5GB
+
 scrape_configs:
    - job_name: 'node_exporter'
      static_configs:
@@ -239,6 +263,9 @@ echo ""
 # Define Docker commands as variables
 PROMETHEUS_CMD="sudo -u prometheus docker run -dt --name prometheus --restart=always \\
   --net='host' \\
+  --memory=1g \\
+  --memory-swap=2g \\
+  --cpu-shares=512 \\
   -v ${config_location}/prometheus.yml:/etc/prometheus/prometheus.yml \\
   -v ${config_location}/prometheus:/prometheus-data \\
   prom/prometheus"
@@ -527,3 +554,255 @@ reboot_prompt
 sleep 5
 reboot_advice
 exit 0
+
+# Add function to setup automated health checks
+setup_automated_health_checks() {
+    echo -e "${GREEN}Setting up automated health checks...${NC}"
+    
+    # Create health check directory
+    sudo mkdir -p /blockchain/monitoring/alerts
+    
+    # Create Prometheus alert rules
+    cat > /blockchain/monitoring/alerts/node_alerts.yml << EOL
+groups:
+- name: node_alerts
+  rules:
+  - alert: NodeDown
+    expr: up == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      description: "Node {{ \$labels.instance }} has been down for more than 5 minutes"
+      summary: "Node is down"
+
+  - alert: HighSyncDelay
+    expr: ethereum_sync_delay > 100
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      description: "Node {{ \$labels.instance }} sync delay is high (> 100 blocks)"
+      summary: "High sync delay detected"
+
+  - alert: DiskSpaceLow
+    expr: node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} * 100 < 10
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      description: "Disk space is below 10% on {{ \$labels.instance }}"
+      summary: "Low disk space warning"
+
+  - alert: HighCPUUsage
+    expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      description: "CPU usage is above 90% on {{ \$labels.instance }} for more than 15 minutes"
+      summary: "High CPU usage detected"
+
+  - alert: HighMemoryUsage
+    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      description: "Memory usage is above 90% on {{ \$labels.instance }} for more than 15 minutes"
+      summary: "High memory usage detected"
+
+  - alert: LowPeerCount
+    expr: ethereum_peer_count < 10
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      description: "Peer count is below 10 on {{ \$labels.instance }}"
+      summary: "Low peer count detected"
+
+  - alert: BlockchainNotSyncing
+    expr: increase(ethereum_block_height[1h]) == 0
+    for: 1h
+    labels:
+      severity: critical
+    annotations:
+      description: "Blockchain is not syncing on {{ \$labels.instance }}"
+      summary: "Blockchain sync stalled"
+EOL
+
+    # Update Prometheus configuration to include alerts
+    cat > /blockchain/prometheus.yml << EOL
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "/etc/prometheus/alerts/*.yml"
+
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - localhost:9093
+
+scrape_configs:
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['localhost:9100']
+  
+  - job_name: 'nodes'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['localhost:5054']
+  
+  - job_name: 'geth'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /debug/metrics/prometheus
+    scheme: http
+    static_configs:
+    - targets: ['localhost:6060']
+EOL
+
+    echo -e "${GREEN}Automated health checks have been set up${NC}"
+    echo "Health checks will run every 15 minutes"
+    echo "Check /blockchain/logs/health_check.log for results"
+}
+
+# Add health check setup to the main monitoring setup
+setup_monitoring() {
+    # ... existing monitoring setup code ...
+    
+    # Add health checks
+    setup_automated_health_checks
+    
+    echo -e "${GREEN}Monitoring and health checks setup complete${NC}"
+    echo "You can access Grafana at http://localhost:3000"
+    echo "Default credentials: admin/admin"
+    echo "Health check logs are in /blockchain/logs/health_check.log"
+}
+
+# Create health check script
+cat > /blockchain/helper/health_check.sh << 'EOL'
+#!/bin/bash
+
+# Colors for output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
+# Function to check if a service is running
+check_service() {
+    local service=$1
+    if docker ps | grep -q "$service"; then
+        echo -e "${GREEN}$service is running${NC}"
+        return 0
+    else
+        echo -e "${RED}$service is not running${NC}"
+        return 1
+    fi
+}
+
+# Function to check disk space
+check_disk_space() {
+    local threshold=10
+    local disk_usage=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
+    if [ "$disk_usage" -gt "$threshold" ]; then
+        echo -e "${RED}Warning: Disk usage is at ${disk_usage}%${NC}"
+        return 1
+    else
+        echo -e "${GREEN}Disk space OK (${disk_usage}% used)${NC}"
+        return 0
+    fi
+}
+
+# Function to check memory usage
+check_memory() {
+    local threshold=90
+    local memory_usage=$(free | awk '/Mem:/ {print int($3/$2 * 100)}')
+    if [ "$memory_usage" -gt "$threshold" ]; then
+        echo -e "${RED}Warning: Memory usage is at ${memory_usage}%${NC}"
+        return 1
+    else
+        echo -e "${GREEN}Memory usage OK (${memory_usage}%)${NC}"
+        return 0
+    fi
+}
+
+# Function to check sync status
+check_sync_status() {
+    local sync_status=$(curl -s -X POST -H "Content-Type: application/json" \
+        --data '{"jsonrpc":"2.0","method":"eth_syncing","params":[],"id":1}' \
+        http://localhost:8545)
+    
+    if echo "$sync_status" | grep -q "false"; then
+        echo -e "${GREEN}Node is in sync${NC}"
+        return 0
+    else
+        echo -e "${YELLOW}Node is still syncing${NC}"
+        return 1
+    fi
+}
+
+# Main health check
+echo "Running health check..."
+echo "======================"
+
+check_service "execution"
+check_service "beacon"
+check_service "prometheus"
+check_service "grafana"
+check_disk_space
+check_memory
+check_sync_status
+
+# Log results
+logger "PulseChain node health check completed"
+EOL
+
+# Make health check script executable
+sudo chmod +x /blockchain/helper/health_check.sh
+
+# Create cron job for automated health checks
+(crontab -l 2>/dev/null; echo "*/15 * * * * /blockchain/helper/health_check.sh > /blockchain/logs/health_check.log 2>&1") | crontab -
+
+echo -e "${GREEN}Automated health checks have been set up${NC}"
+echo "Health checks will run every 15 minutes"
+echo "Check /blockchain/logs/health_check.log for results"
+
+# Add after Grafana setup
+# Change default Grafana password
+GRAFANA_NEW_PASSWORD=$(openssl rand -base64 12)
+curl -X PUT -H "Content-Type: application/json" \
+     -d "{\"oldPassword\":\"admin\",\"newPassword\":\"$GRAFANA_NEW_PASSWORD\"}" \
+     --user "admin:admin" \
+     http://localhost:3000/api/user/password
+
+echo "New Grafana password: $GRAFANA_NEW_PASSWORD"
+echo "Please save this password securely!"
+
+uninstall_monitoring() {
+    echo "Removing monitoring setup..."
+    
+    # Stop and remove containers
+    for container in prometheus node_exporter grafana; do
+        sudo docker stop $container 2>/dev/null
+        sudo docker rm $container 2>/dev/null
+    done
+    
+    # Remove configuration
+    [ -d "$config_location" ] && sudo rm -rf "$config_location"
+    
+    # Remove users
+    sudo userdel prometheus 2>/dev/null
+    sudo userdel grafana 2>/dev/null
+    
+    # Remove firewall rules
+    sudo ufw delete allow from 127.0.0.1 to any port 8545 proto tcp
+    sudo ufw delete allow from 127.0.0.1 to any port 8546 proto tcp
+    sudo ufw delete allow from 127.0.0.1 to any port 5052 proto tcp
+    
+    echo "Monitoring setup removed successfully"
+}

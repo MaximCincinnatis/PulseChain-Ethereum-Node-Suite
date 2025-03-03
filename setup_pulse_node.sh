@@ -21,6 +21,90 @@ set -e
 # Set up error handling
 trap 'handle_error $? ${LINENO} "${BASH_COMMAND}"' ERR
 
+# Add system requirements check function
+check_system_requirements() {
+    echo -e "${GREEN}Checking System Requirements...${NC}"
+    echo "================================"
+    
+    # Check CPU cores
+    cpu_cores=$(nproc)
+    echo -n "CPU Cores: $cpu_cores - "
+    if [ "$cpu_cores" -lt 4 ]; then
+        echo -e "${RED}WARNING: Minimum 4 CPU cores recommended${NC}"
+        read -p "Continue anyway? (y/n): " continue_setup
+        if [[ "$continue_setup" != "y" && "$continue_setup" != "Y" ]]; then
+            echo "Setup aborted by user."
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}OK${NC}"
+    fi
+    
+    # Check RAM
+    total_ram=$(free -g | awk '/^Mem:/{print $2}')
+    echo -n "RAM: ${total_ram}GB - "
+    if [ "$total_ram" -lt 16 ]; then
+        echo -e "${RED}WARNING: Minimum 16GB RAM recommended${NC}"
+        read -p "Continue anyway? (y/n): " continue_setup
+        if [[ "$continue_setup" != "y" && "$continue_setup" != "Y" ]]; then
+            echo "Setup aborted by user."
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}OK${NC}"
+    fi
+    
+    # Check disk space
+    free_space=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
+    echo -n "Free Disk Space: ${free_space}GB - "
+    if [ "$free_space" -lt 2000 ]; then
+        echo -e "${RED}WARNING: Minimum 2TB free space recommended${NC}"
+        read -p "Continue anyway? (y/n): " continue_setup
+        if [[ "$continue_setup" != "y" && "$continue_setup" != "Y" ]]; then
+            echo "Setup aborted by user."
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}OK${NC}"
+    fi
+    
+    # Check if running in a VM
+    if systemd-detect-virt --quiet; then
+        virt_type=$(systemd-detect-virt)
+        echo -e "${YELLOW}Notice: Running in a virtual machine ($virt_type)${NC}"
+        echo "Performance may be impacted. Ensure proper resource allocation."
+        read -p "Press Enter to continue..."
+    fi
+    
+    # Check network speed
+    echo -n "Testing network speed... "
+    if which speedtest-cli >/dev/null 2>&1; then
+        speed_test=$(speedtest-cli --simple 2>/dev/null)
+        download_speed=$(echo "$speed_test" | awk '/Download/ {print $2}')
+        upload_speed=$(echo "$speed_test" | awk '/Upload/ {print $2}')
+        
+        if [ -n "$download_speed" ] && [ -n "$upload_speed" ]; then
+            echo -e "\nDownload: ${download_speed} Mbit/s"
+            echo -n "Upload: ${upload_speed} Mbit/s - "
+            if (( $(echo "$upload_speed < 10" | bc -l) )); then
+                echo -e "${YELLOW}WARNING: Minimum 10 Mbps upload recommended${NC}"
+            else
+                echo -e "${GREEN}OK${NC}"
+            fi
+        else
+            echo -e "${YELLOW}Could not determine network speed${NC}"
+        fi
+    else
+        echo -e "${YELLOW}speedtest-cli not installed, skipping network speed test${NC}"
+    fi
+    
+    echo "================================"
+    read -p "Press Enter to continue with setup..."
+}
+
+# Call the system requirements check
+check_system_requirements
+
 # Error handling function
 handle_error() {
   local exit_code=$1
@@ -97,7 +181,6 @@ echo "
         ▓▓▓▓▓▓▓▓▓▓▓▓▓▓     ▓▓▓▓▓  ▓▓   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓               
          ░▓▓▓▓▓▓▓▓▓▓▓▓▓▒  ▓▓▓▓▓▓  ▓▒  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                 
            ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓      ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                  
-            ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                      
             ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                   
              ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                    
               ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓   ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓                     

@@ -617,6 +617,201 @@ show_config() {
     echo ""
 }
 
+# Add configuration validation function
+validate_configuration() {
+    local config_file="/blockchain/node_config.json"
+    echo -e "${GREEN}Validating configuration...${NC}"
+    echo "================================"
+    
+    # Check if config file exists
+    if [ ! -f "$config_file" ]; then
+        echo -e "${RED}Error: Configuration file not found: $config_file${NC}"
+        return 1
+    fi
+    
+    # Check if file is valid JSON
+    if ! jq empty "$config_file" 2>/dev/null; then
+        echo -e "${RED}Error: Invalid JSON format in configuration file${NC}"
+        return 1
+    }
+    
+    # Required fields and their types
+    declare -A required_fields=(
+        ["network"]="string"
+        ["execution_client"]="string"
+        ["consensus_client"]="string"
+        ["data_directory"]="string"
+        ["monitoring_enabled"]="boolean"
+        ["network_mode"]="string"
+        ["log_level"]="string"
+    )
+    
+    # Validate required fields and their types
+    for field in "${!required_fields[@]}"; do
+        expected_type="${required_fields[$field]}"
+        
+        # Check if field exists
+        if ! jq -e ".$field" "$config_file" >/dev/null 2>&1; then
+            echo -e "${RED}Error: Missing required field: $field${NC}"
+            return 1
+        fi
+        
+        # Validate field type
+        value_type=$(jq -r "type.$field" "$config_file")
+        if [ "$value_type" != "$expected_type" ]; then
+            echo -e "${RED}Error: Field $field should be $expected_type, found $value_type${NC}"
+            return 1
+        fi
+    done
+    
+    # Validate specific field values
+    network=$(jq -r '.network' "$config_file")
+    if [[ "$network" != "mainnet" && "$network" != "testnet" ]]; then
+        echo -e "${RED}Error: Invalid network value. Must be 'mainnet' or 'testnet'${NC}"
+        return 1
+    fi
+    
+    execution_client=$(jq -r '.execution_client' "$config_file")
+    if [[ "$execution_client" != "geth" && "$execution_client" != "erigon" ]]; then
+        echo -e "${RED}Error: Invalid execution client. Must be 'geth' or 'erigon'${NC}"
+        return 1
+    fi
+    
+    consensus_client=$(jq -r '.consensus_client' "$config_file")
+    if [[ "$consensus_client" != "lighthouse" && "$consensus_client" != "prysm" ]]; then
+        echo -e "${RED}Error: Invalid consensus client. Must be 'lighthouse' or 'prysm'${NC}"
+        return 1
+    }
+    
+    # Validate data directory
+    data_dir=$(jq -r '.data_directory' "$config_file")
+    if [ ! -d "$data_dir" ]; then
+        echo -e "${YELLOW}Warning: Data directory does not exist: $data_dir${NC}"
+        echo "Directory will be created during setup"
+    fi
+    
+    # Validate network ports
+    if ! command -v nc >/dev/null 2>&1; then
+        echo -e "${YELLOW}Warning: 'nc' command not found, skipping port checks${NC}"
+    else
+        # Check execution client port
+        execution_port=$(jq -r '.execution_port // 8545' "$config_file")
+        if nc -z localhost "$execution_port" 2>/dev/null; then
+            echo -e "${YELLOW}Warning: Port $execution_port is already in use${NC}"
+        fi
+        
+        # Check consensus client port
+        consensus_port=$(jq -r '.consensus_port // 5052' "$config_file")
+        if nc -z localhost "$consensus_port" 2>/dev/null; then
+            echo -e "${YELLOW}Warning: Port $consensus_port is already in use${NC}"
+        fi
+    fi
+    
+    # Validate monitoring settings if enabled
+    monitoring_enabled=$(jq -r '.monitoring_enabled' "$config_file")
+    if [ "$monitoring_enabled" = "true" ]; then
+        grafana_port=$(jq -r '.grafana_port // 3000' "$config_file")
+        prometheus_port=$(jq -r '.prometheus_port // 9090' "$config_file")
+        
+        if nc -z localhost "$grafana_port" 2>/dev/null; then
+            echo -e "${YELLOW}Warning: Grafana port $grafana_port is already in use${NC}"
+        fi
+        
+        if nc -z localhost "$prometheus_port" 2>/dev/null; then
+            echo -e "${YELLOW}Warning: Prometheus port $prometheus_port is already in use${NC}"
+        fi
+    fi
+    
+    echo -e "${GREEN}Configuration validation completed successfully${NC}"
+    return 0
+}
+
+# Function to fix common configuration issues
+fix_configuration() {
+    local config_file="/blockchain/node_config.json"
+    
+    # Create backup
+    cp "$config_file" "${config_file}.backup"
+    
+    # Fix missing fields with defaults
+    if ! jq -e '.monitoring_enabled' "$config_file" >/dev/null 2>&1; then
+        jq '. + {"monitoring_enabled": true}' "$config_file" > "${config_file}.tmp"
+        mv "${config_file}.tmp" "$config_file"
+    fi
+    
+    if ! jq -e '.network_mode' "$config_file" >/dev/null 2>&1; then
+        jq '. + {"network_mode": "local"}' "$config_file" > "${config_file}.tmp"
+        mv "${config_file}.tmp" "$config_file"
+    fi
+    
+    if ! jq -e '.log_level' "$config_file" >/dev/null 2>&1; then
+        jq '. + {"log_level": "info"}' "$config_file" > "${config_file}.tmp"
+        mv "${config_file}.tmp" "$config_file"
+    fi
+    
+    # Ensure data directory exists
+    data_dir=$(jq -r '.data_directory' "$config_file")
+    mkdir -p "$data_dir"
+    
+    echo -e "${GREEN}Configuration has been fixed with default values${NC}"
+    echo "A backup of the original configuration has been saved to ${config_file}.backup"
+}
+
+# Add validation to the main configuration menu
+show_config_menu() {
+    while true; do
+        clear
+        echo -e "${GREEN}Node Configuration Menu${NC}"
+        echo "======================="
+        echo "1. Show current configuration"
+        echo "2. Validate configuration"
+        echo "3. Fix configuration issues"
+        echo "4. Edit configuration"
+        echo "5. Save configuration"
+        echo "6. Create default configuration"
+        echo "7. Back to main menu"
+        echo
+        read -p "Please select an option (1-7): " choice
+        
+        case $choice in
+            1)
+                show_current_config
+                ;;
+            2)
+                if validate_configuration; then
+                    echo -e "${GREEN}Configuration is valid${NC}"
+                else
+                    echo -e "${RED}Configuration validation failed${NC}"
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            3)
+                if ! validate_configuration; then
+                    echo -e "${YELLOW}Attempting to fix configuration issues...${NC}"
+                    fix_configuration
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            4)
+                edit_config
+                ;;
+            5)
+                save_config
+                ;;
+            6)
+                create_default_config
+                ;;
+            7)
+                return 0
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                sleep 2
+                ;;
+        esac
+    done
+}
+
 # Initialize config if this script is run directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     echo "PulseChain Node Configuration Utility"

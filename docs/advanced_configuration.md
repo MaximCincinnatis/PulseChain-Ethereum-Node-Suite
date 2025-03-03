@@ -1,29 +1,35 @@
-# PulseChain Node Advanced Configuration Guide
+# Node Suite Advanced Configuration Guide
 
-This document provides detailed information about the advanced configuration options available for your PulseChain node. Understanding these options will help you optimize performance, customize your setup, and make the most of your node.
+This document provides detailed information about the advanced configuration options available for your node. The suite supports installation of EITHER PulseChain OR Ethereum network, chosen during initial setup.
+
+## ⚠️ Important Note on Network Selection
+
+**The network (PulseChain or Ethereum) must be chosen during initial installation. You cannot switch networks after installation without a complete reinstallation of the system.**
 
 ## Table of Contents
 
 1. [Configuration System Overview](#configuration-system-overview)
 2. [Configuration File Location](#configuration-file-location)
-3. [Client Configuration Options](#client-configuration-options)
-4. [Network Configuration](#network-configuration)
-5. [Performance Tuning](#performance-tuning)
-6. [API Configuration](#api-configuration)
-7. [Monitoring Options](#monitoring-options)
-8. [Health Check Parameters](#health-check-parameters)
-9. [Update Settings](#update-settings)
-10. [Logging Configuration](#logging-configuration)
-11. [Command Line Usage](#command-line-usage)
-12. [Troubleshooting Configuration Issues](#troubleshooting-configuration-issues)
+3. [Network Selection](#network-selection)
+4. [Client Configuration Options](#client-configuration-options)
+5. [Network-Specific Settings](#network-specific-settings)
+6. [Performance Tuning](#performance-tuning)
+7. [API Configuration](#api-configuration)
+8. [Monitoring Options](#monitoring-options)
+9. [Health Check Parameters](#health-check-parameters)
+10. [Update Settings](#update-settings)
+11. [Logging Configuration](#logging-configuration)
+12. [Command Line Usage](#command-line-usage)
+13. [Troubleshooting Configuration Issues](#troubleshooting-configuration-issues)
 
 ## Configuration System Overview
 
-The PulseChain Node Suite uses a centralized JSON-based configuration system. All settings are stored in a single configuration file, making it easy to back up, restore, or transfer your configuration between systems.
+The Node Suite uses a centralized JSON-based configuration system. All settings are stored in a single configuration file, making it easy to back up, restore, or transfer your configuration between systems.
 
 Key benefits of this approach:
 - **Centralized management**: All settings in one place
 - **Structured format**: JSON provides a well-defined structure
+- **Network-specific**: Optimized for your chosen network
 - **Compatibility**: Easy integration with other tools
 - **Validation**: Automatic validation prevents configuration errors
 
@@ -42,11 +48,26 @@ export NODE_CONFIG_FILE=/path/to/my-config.json
 ./setup_pulse_node.sh
 ```
 
+## Network Selection
+
+The network selection is a one-time choice made during installation:
+
+| Option | Description | Values |
+|--------|-------------|---------|
+| `network.type` | Network selection (set during installation) | `pulsechain` OR `ethereum` |
+| `network.chain` | Chain selection | For PulseChain: `mainnet`, `testnet`<br>For Ethereum: `mainnet`, `goerli`, `sepolia` |
+
+### Network-Specific Configuration Files
+Based on your chosen network during installation:
+- PulseChain configuration: `/blockchain/pulse_config.json`
+OR
+- Ethereum configuration: `/blockchain/eth_config.json`
+
 ## Client Configuration Options
 
 ### Execution Client Options
 
-The execution client (Geth or Erigon) can be customized with these settings:
+The execution client can be customized with these settings for both networks:
 
 | Option | Description | Default Value | Acceptable Values |
 |--------|-------------|---------------|-------------------|
@@ -56,23 +77,33 @@ The execution client (Geth or Erigon) can be customized with these settings:
 | `clients.execution.api_enabled` | Whether to enable the JSON-RPC API | `true` | `true`, `false` |
 | `clients.execution.api_methods` | Comma-separated list of enabled API methods | `eth,net,web3,txpool` | Varies by client |
 
-#### Geth-Specific Options
+#### Network-Specific Settings
 
-If you're using Geth as your execution client, the following options apply:
+PulseChain:
+```json
+{
+    "network": {
+        "type": "pulsechain",
+        "chain": "mainnet",
+        "bootstrap_nodes": ["enode://..."]
+    }
+}
+```
 
-- **Cache Size**: Higher values improve performance but require more RAM. For systems with 16GB+ RAM, values of 4096 or higher are recommended.
-- **Max Peers**: Higher values may improve sync speed but increase bandwidth usage. Values between 25-100 are recommended.
-
-#### Erigon-Specific Options
-
-For Erigon users, consider these guidelines:
-
-- **Cache Size**: Erigon has different memory management - values between 1024-4096 are usually sufficient.
-- **Database Options**: Erigon uses a different database structure and has special parameters for database management.
+Ethereum:
+```json
+{
+    "network": {
+        "type": "ethereum",
+        "chain": "mainnet",
+        "bootstrap_nodes": ["enode://..."]
+    }
+}
+```
 
 ### Consensus Client Options
 
-The consensus client (Lighthouse or Prysm) can be customized with these settings:
+The consensus client can be customized for both networks:
 
 | Option | Description | Default Value | Acceptable Values |
 |--------|-------------|---------------|-------------------|
@@ -80,33 +111,33 @@ The consensus client (Lighthouse or Prysm) can be customized with these settings
 | `clients.consensus.metrics_enabled` | Enable Prometheus metrics | `true` | `true`, `false` |
 | `clients.consensus.api_enabled` | Enable the client API | `true` | `true`, `false` |
 
-#### Lighthouse-Specific Options
+## Network-Specific Settings
 
-Lighthouse has these specific configuration options:
+### If You Chose PulseChain
 
-- **Target Peers**: Controls how many peers to maintain connections with.
-- **Execution Endpoints**: Multiple endpoints can be specified for redundancy.
+```json
+{
+    "network": {
+        "type": "pulsechain",
+        "chain": "mainnet",
+        "network_id": 369,
+        "chain_id": 369
+    }
+}
+```
 
-#### Prysm-Specific Options
+### If You Chose Ethereum
 
-Prysm has these unique options:
-
-- **RPC Port**: The port to use for the RPC server.
-- **Monitoring Host**: The host address for the monitoring endpoint.
-
-## Network Configuration
-
-The network configuration determines which PulseChain network your node connects to:
-
-| Option | Description | Default Value | Acceptable Values |
-|--------|-------------|---------------|-------------------|
-| `network` | The PulseChain network to connect to | `mainnet` | `mainnet`, `testnet` |
-
-This setting affects:
-- Network ID and Chain ID
-- Genesis block
-- Bootnodes
-- Checkpoint URL
+```json
+{
+    "network": {
+        "type": "ethereum",
+        "chain": "mainnet",
+        "network_id": 1,
+        "chain_id": 1
+    }
+}
+```
 
 ## Performance Tuning
 
@@ -262,6 +293,22 @@ Common configuration issues and their solutions:
 **Symptom**: Cannot connect to node API from external applications.
 **Solution**: Check `api.addr` setting - make sure it's set to `0.0.0.0` for external access.
 
+## Network-Specific Troubleshooting
+
+### PulseChain Issues
+
+Common PulseChain-specific issues and solutions:
+- Sync issues with PulseChain network
+- PulseChain-specific API endpoints
+- Network ID mismatches
+
+### Ethereum Issues
+
+Common Ethereum-specific issues and solutions:
+- Large chain data management
+- Ethereum network congestion handling
+- Gas price monitoring
+
 ## Example Configuration
 
 Here's a complete example configuration for a high-performance node:
@@ -279,7 +326,10 @@ Here's a complete example configuration for a high-performance node:
     "logs": "/blockchain/logs",
     "jwt": "/blockchain/jwt.hex"
   },
-  "network": "mainnet",
+  "network": {
+    "type": "pulsechain",
+    "chain": "mainnet"
+  },
   "clients": {
     "execution": {
       "name": "geth",
