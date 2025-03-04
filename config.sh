@@ -8,7 +8,290 @@
 # ===============================================================================
 
 # Version tracking
-CONFIG_VERSION="0.1.1"
+CONFIG_VERSION="0.1.2"
+
+# ===============================================================================
+# Security Configuration
+# ===============================================================================
+
+# JWT configuration
+JWT_FILE="${CUSTOM_PATH}/.secrets/jwt.hex"
+JWT_PERMISSIONS="600"
+JWT_LENGTH=32
+
+# API Security
+API_CORS_DOMAINS="${API_CORS_DOMAINS:-localhost,*.pulsechain.com}"
+API_VHOSTS="${API_VHOSTS:-localhost,node.pulsechain.com}"
+API_ADDR="${API_ADDR:-127.0.0.1}"  # Default to localhost only
+API_PORT="${API_PORT:-8545}"
+API_WS_PORT="${API_WS_PORT:-8546}"
+
+# Authentication
+AUTH_ENABLED="true"
+AUTH_JWT_SECRET_FILE="${CUSTOM_PATH}/.secrets/auth.jwt"
+AUTH_RATE_LIMIT="100"  # Requests per minute
+AUTH_ALLOWED_IPS="${AUTH_ALLOWED_IPS:-127.0.0.1}"
+
+# ===============================================================================
+# Node Operation Mode
+# ===============================================================================
+
+# Node operation modes:
+# - LOCAL_INTENSIVE: Optimized for unrestricted local access, maximum performance
+# - LOCAL_STANDARD: Standard local node with basic restrictions
+# - PUBLIC_SECURE: Public node with security measures
+# - PUBLIC_ARCHIVE: Public archive node with rate limiting
+NODE_OPERATION_MODE="${NODE_OPERATION_MODE:-LOCAL_INTENSIVE}"
+
+# ===============================================================================
+# Multi-Machine Configuration
+# ===============================================================================
+
+# Cross-machine access settings
+ALLOW_LOCAL_NETWORK="${ALLOW_LOCAL_NETWORK:-true}"
+LOCAL_NETWORK_RANGE="${LOCAL_NETWORK_RANGE:-192.168.0.0/16}"
+LOCAL_MACHINE_IPS="${LOCAL_MACHINE_IPS:-}"  # Comma-separated list of allowed IPs
+
+# RPC access configuration for local network
+RPC_LOCAL_NETWORK="${RPC_LOCAL_NETWORK:-true}"
+RPC_ALLOWED_METHODS="admin,debug,eth,net,web3,txpool,trace,parity"
+RPC_MAX_CONNECTIONS_LOCAL=1000
+WS_MAX_CONNECTIONS_LOCAL=1000
+
+# ===============================================================================
+# Mempool Monitoring Configuration
+# ===============================================================================
+
+# Mempool monitoring settings
+MEMPOOL_MONITORING="${MEMPOOL_MONITORING:-detailed}"  # Options: basic, detailed
+MEMPOOL_METRICS_INTERVAL=15  # Seconds between mempool metrics collection
+MEMPOOL_MAX_SLOTS=5000      # Maximum number of pending transactions to track
+MEMPOOL_HISTORY_HOURS=24    # Hours of mempool history to maintain
+
+# Mempool metrics configuration
+MEMPOOL_METRICS_ENABLED="true"
+MEMPOOL_ALERT_THRESHOLD=1000  # Alert if pending transactions exceed this
+MEMPOOL_GAS_PRICE_TRACKING="true"
+MEMPOOL_REORG_TRACKING="true"
+
+# ===============================================================================
+# Indexing Support Configuration
+# ===============================================================================
+
+# Indexing optimization
+INDEXING_MODE="${INDEXING_MODE:-true}"
+INDEX_BATCH_SIZE=10000
+INDEX_CACHE_SIZE_GB=$((total_memory * 30 / 100))  # 30% of memory for indexing
+ARCHIVE_PRUNING_DISABLED=true  # Ensure no pruning for archive nodes
+
+# Database optimization for indexing
+DB_WRITE_BUFFER_SIZE=$((INDEX_CACHE_SIZE_GB * 64))  # MB
+DB_BLOCK_CACHE_SIZE=$((INDEX_CACHE_SIZE_GB * 512))  # MB
+DB_MAX_OPEN_FILES=500000
+
+# Index specific features
+INDEX_TRACES="true"
+INDEX_LOGS="true"
+INDEX_TRANSACTIONS="true"
+INDEX_STATE="true"
+
+# Performance tuning for indexing
+PARALLEL_BLOCK_PROCESSING=true
+MAX_INDEXING_THREADS=$((total_cores - 2))  # Reserve 2 cores for system
+
+# Mode-specific configurations
+configure_operation_mode() {
+    case "$NODE_OPERATION_MODE" in
+        "LOCAL_INTENSIVE")
+            # Unrestricted local access configuration
+            API_CORS_DOMAINS="*"
+            API_VHOSTS="*"
+            API_ADDR="0.0.0.0"
+            AUTH_ENABLED="false"
+            AUTH_RATE_LIMIT="0"  # No rate limiting
+            RPC_MAX_CONNECTIONS=1000
+            WS_MAX_CONNECTIONS=1000
+            EXECUTION_API_METHODS="admin,debug,eth,net,web3,txpool,trace,parity"
+            CACHE_SIZE_GB=$((total_memory * 70 / 100))  # 70% of total memory
+            MAX_PEERS=100
+            ALLOW_UNPROTECTED_TXS="true"
+            DB_CACHE_MB=$((CACHE_SIZE_GB * 1024))
+            PREIMAGES_ENABLED="true"
+            STATE_CACHE_MB=$((CACHE_SIZE_GB * 512))  # Half of cache for state
+            SNAPSHOT_CACHE_MB=$((CACHE_SIZE_GB * 256))  # Quarter of cache for snapshots
+            
+            # Performance tuning
+            GOMAXPROCS=$((total_cores - 2))  # Reserve 2 cores for system
+            GETH_OPTS="--cache.preimages --cache.noprefetch=false --txlookuplimit=0"
+            ;;
+            
+        "LOCAL_STANDARD")
+            # Standard local node configuration
+            API_CORS_DOMAINS="localhost,127.0.0.1"
+            API_VHOSTS="localhost"
+            API_ADDR="127.0.0.1"
+            AUTH_ENABLED="true"
+            AUTH_RATE_LIMIT="1000"
+            RPC_MAX_CONNECTIONS=100
+            WS_MAX_CONNECTIONS=50
+            EXECUTION_API_METHODS="eth,net,web3,txpool"
+            CACHE_SIZE_GB=$((total_memory * 50 / 100))
+            MAX_PEERS=50
+            ;;
+            
+        "PUBLIC_SECURE")
+            # Public node with security measures
+            API_CORS_DOMAINS="${PUBLIC_CORS_DOMAINS:-*}"
+            API_VHOSTS="${PUBLIC_VHOSTS:-*}"
+            API_ADDR="0.0.0.0"
+            AUTH_ENABLED="true"
+            AUTH_RATE_LIMIT="100"
+            RPC_MAX_CONNECTIONS=50
+            WS_MAX_CONNECTIONS=25
+            EXECUTION_API_METHODS="eth,net,web3"
+            CACHE_SIZE_GB=$((total_memory * 40 / 100))
+            MAX_PEERS=25
+            ;;
+            
+        "PUBLIC_ARCHIVE")
+            # Public archive node configuration
+            API_CORS_DOMAINS="${PUBLIC_CORS_DOMAINS:-*}"
+            API_VHOSTS="${PUBLIC_VHOSTS:-*}"
+            API_ADDR="0.0.0.0"
+            AUTH_ENABLED="true"
+            AUTH_RATE_LIMIT="50"
+            RPC_MAX_CONNECTIONS=25
+            WS_MAX_CONNECTIONS=10
+            EXECUTION_API_METHODS="eth,net,web3"
+            CACHE_SIZE_GB=$((total_memory * 60 / 100))
+            MAX_PEERS=25
+            ;;
+    esac
+}
+
+# System tuning for intensive local access
+tune_system_for_intensive_local() {
+    if [ "$NODE_OPERATION_MODE" = "LOCAL_INTENSIVE" ]; then
+        # Increase system limits
+        ulimit -n 1000000
+        sysctl -w fs.file-max=1000000
+        sysctl -w net.core.somaxconn=65535
+        sysctl -w net.ipv4.tcp_max_syn_backlog=65536
+        sysctl -w net.core.netdev_max_backlog=65536
+        sysctl -w net.ipv4.tcp_tw_reuse=1
+        
+        # Increase TCP buffer sizes
+        sysctl -w net.core.rmem_max=16777216
+        sysctl -w net.core.wmem_max=16777216
+        sysctl -w net.ipv4.tcp_rmem="4096 87380 16777216"
+        sysctl -w net.ipv4.tcp_wmem="4096 87380 16777216"
+        
+        # Optimize disk I/O
+        if command -v hdparm >/dev/null; then
+            for disk in $(lsblk -d -o name | grep -v NAME); do
+                hdparm -W1 /dev/$disk  # Enable write caching
+            done
+        fi
+        
+        # Set I/O scheduler to deadline for SSDs
+        for disk in $(lsblk -d -o name | grep -v NAME); do
+            echo deadline > /sys/block/$disk/queue/scheduler
+            echo 4096 > /sys/block/$disk/queue/read_ahead_kb
+        done
+    fi
+}
+
+# ===============================================================================
+# Resource Management
+# ===============================================================================
+
+# Dynamic resource calculation
+calculate_resources() {
+    local total_memory=$(free -g | awk '/^Mem:/{print $2}')
+    local total_cores=$(nproc)
+    
+    # Calculate execution client resources (50% of available)
+    EXECUTION_MEMORY_LIMIT=$((total_memory / 2))
+    EXECUTION_CPU_LIMIT=$((total_cores / 2))
+    EXECUTION_CACHE_SIZE=$((EXECUTION_MEMORY_LIMIT * 1024 / 2))  # Half of allocated memory in MB
+    
+    # Calculate consensus client resources (30% of available)
+    CONSENSUS_MEMORY_LIMIT=$((total_memory * 3 / 10))
+    CONSENSUS_CPU_LIMIT=$((total_cores * 3 / 10))
+    
+    # Reserve remaining 20% for system and monitoring
+}
+
+# Call resource calculation
+calculate_resources
+
+# ===============================================================================
+# Enhanced Monitoring Configuration
+# ===============================================================================
+
+# Health check settings
+HEALTH_CHECK_INTERVAL=60    # Check every minute
+HEALTH_CHECK_RETRIES=3      # Number of retries before alerting
+
+# Resource thresholds
+DISK_SPACE_THRESHOLD=85     # Alert at 85% usage
+CPU_THRESHOLD=90            # Alert at 90% usage
+MEMORY_THRESHOLD=85        # Alert at 85% usage
+IOPS_THRESHOLD=5000        # Minimum IOPS required
+FILE_DESCRIPTOR_MIN=65535   # Minimum required file descriptors
+
+# Chain-specific monitoring
+SYNC_MAX_BLOCKS_BEHIND=50   # Maximum blocks behind
+MIN_PEER_COUNT=20          # Minimum required peers
+MAX_TX_POOL_SIZE=5000      # Maximum transaction pool size
+
+# Metrics retention
+METRICS_RETENTION_DAYS=30
+METRICS_SCRAPE_INTERVAL="15s"
+
+# ===============================================================================
+# Backup Configuration
+# ===============================================================================
+
+# Backup settings
+BACKUP_ENABLED="true"
+BACKUP_TYPE="incremental"  # Options: full, incremental
+BACKUP_ENCRYPTION="true"
+BACKUP_COMPRESSION="true"
+BACKUP_RETENTION_DAYS=30
+BACKUP_MAX_SIZE_GB=500
+BACKUP_VERIFICATION="true"
+
+# Backup schedule
+BACKUP_SCHEDULE="0 2 * * *"  # Daily at 2 AM
+BACKUP_LOCATION="${CUSTOM_PATH}/backups"
+BACKUP_REMOTE_ENABLED="false"
+BACKUP_REMOTE_URL=""
+BACKUP_REMOTE_KEY=""
+
+# ===============================================================================
+# Error Recovery Configuration
+# ===============================================================================
+
+# Auto-recovery settings
+AUTO_RECOVERY_ENABLED="true"
+MAX_AUTO_RECOVERY_ATTEMPTS=3
+RECOVERY_WAIT_TIME=300  # 5 minutes between attempts
+
+# Service dependencies
+declare -A SERVICE_DEPENDENCIES=(
+    ["consensus"]="execution"
+    ["prometheus"]="execution consensus"
+    ["grafana"]="prometheus"
+)
+
+# Recovery priorities
+declare -A SERVICE_PRIORITIES=(
+    ["execution"]="1"
+    ["consensus"]="2"
+    ["prometheus"]="3"
+    ["grafana"]="4"
+)
 
 # ===============================================================================
 # Configuration File Location
@@ -35,7 +318,6 @@ EXECUTION_PATH="${CUSTOM_PATH}/execution"
 CONSENSUS_PATH="${CUSTOM_PATH}/consensus"
 BACKUP_PATH="${CUSTOM_PATH}/backups"
 LOG_PATH="${CUSTOM_PATH}/logs"
-JWT_FILE="${CUSTOM_PATH}/jwt.hex"
 
 # Client selection defaults
 ETH_CLIENT="${ETH_CLIENT:-geth}"  # Options: geth, erigon
@@ -63,12 +345,6 @@ GRAFANA_ENABLED="true"
 MAINNET_CHECKPOINT="https://checkpoint.v4.testnet.pulsechain.com"
 TESTNET_CHECKPOINT="https://checkpoint.v4.testnet.pulsechain.com"
 
-# Health check settings
-HEALTH_CHECK_INTERVAL=300  # seconds
-DISK_SPACE_THRESHOLD=90    # percentage
-CPU_THRESHOLD=95           # percentage
-MEMORY_THRESHOLD=90        # percentage
-
 # Update settings
 AUTO_UPDATE_ENABLED="false"
 BACKUP_BEFORE_UPDATE="true"
@@ -83,7 +359,6 @@ LOG_ROTATION_DAYS=14  # Number of days to keep logs
 # ===============================================================================
 
 # Execution client configuration
-EXECUTION_CACHE_SIZE=2048  # MB
 EXECUTION_MAX_PEERS=50
 EXECUTION_API_ENABLED="true"
 EXECUTION_API_METHODS="eth,net,web3,txpool"
@@ -91,11 +366,6 @@ EXECUTION_API_METHODS="eth,net,web3,txpool"
 # Consensus client configuration
 CONSENSUS_METRICS_ENABLED="true"
 CONSENSUS_API_ENABLED="true"
-
-# API configuration
-API_CORS_DOMAINS="*"
-API_VHOSTS="*"
-API_ADDR="127.0.0.1"  # Use 0.0.0.0 for remote access
 
 # ===============================================================================
 # FUNCTIONS TO MANAGE CONFIGURATION
@@ -196,47 +466,121 @@ EOL
 
 # Validate the configuration file structure
 validate_config() {
-    local config_file="$1"
+    local validation_errors=0
     
-    # Check if the file exists
-    if [ ! -f "$config_file" ]; then
-        return 1
-    fi
-    
-    # Check if the file is valid JSON
-    if ! jq . "$config_file" > /dev/null 2>&1; then
-        echo "Error: Configuration file is not valid JSON"
-        return 1
-    fi
-    
-    # Check if required sections exist (version, paths, clients)
-    if ! jq -e '.version and .paths and .clients' "$config_file" > /dev/null 2>&1; then
-        echo "Error: Configuration file is missing required sections"
-        return 1
+    # Function to log validation errors
+    log_validation_error() {
+        local error_message=$1
+        echo -e "${RED}Configuration Error: ${error_message}${NC}" >&2
+        ((validation_errors++))
     }
-    
+
+    # Validate memory settings
+    validate_memory_settings() {
+        local total_memory=$(free -g | awk '/^Mem:/{print $2}')
+        
+        # Validate cache sizes don't exceed available memory
+        if [ "$CACHE_SIZE_GB" -gt "$total_memory" ]; then
+            log_validation_error "CACHE_SIZE_GB ($CACHE_SIZE_GB) exceeds total system memory ($total_memory GB)"
+        fi
+        
+        # Validate memory limits
+        if [ "$EXECUTION_MEMORY_LIMIT" -gt "$total_memory" ]; then
+            log_validation_error "EXECUTION_MEMORY_LIMIT ($EXECUTION_MEMORY_LIMIT) exceeds total system memory"
+        fi
+        
+        if [ "$CONSENSUS_MEMORY_LIMIT" -gt "$total_memory" ]; then
+            log_validation_error "CONSENSUS_MEMORY_LIMIT ($CONSENSUS_MEMORY_LIMIT) exceeds total system memory"
+        fi
+        
+        # Validate total allocated memory doesn't exceed 90% of system memory
+        local total_allocated=$((EXECUTION_MEMORY_LIMIT + CONSENSUS_MEMORY_LIMIT))
+        if [ "$total_allocated" -gt "$((total_memory * 90 / 100))" ]; then
+            log_validation_error "Total allocated memory ($total_allocated GB) exceeds 90% of system memory"
+        fi
+    }
+
+    # Validate network settings
+    validate_network_settings() {
+        # Validate API address format
+        if ! echo "$API_ADDR" | grep -E '^([0-9]{1,3}\.){3}[0-9]{1,3}$|^localhost$' >/dev/null; then
+            log_validation_error "Invalid API_ADDR format: $API_ADDR"
+        fi
+        
+        # Validate ports are within valid range
+        if ! [[ "$API_PORT" =~ ^[0-9]+$ ]] || [ "$API_PORT" -lt 1024 ] || [ "$API_PORT" -gt 65535 ]; then
+            log_validation_error "Invalid API_PORT: $API_PORT (must be between 1024-65535)"
+        fi
+        
+        if ! [[ "$API_WS_PORT" =~ ^[0-9]+$ ]] || [ "$API_WS_PORT" -lt 1024 ] || [ "$API_WS_PORT" -gt 65535 ]; then
+            log_validation_error "Invalid API_WS_PORT: $API_WS_PORT (must be between 1024-65535)"
+        fi
+    }
+
+    # Validate security settings
+    validate_security_settings() {
+        # Validate JWT configuration
+        if [ ! -f "$JWT_FILE" ] && [ "$AUTH_ENABLED" = "true" ]; then
+            log_validation_error "JWT file not found at $JWT_FILE but authentication is enabled"
+        fi
+        
+        # Validate JWT permissions if file exists
+        if [ -f "$JWT_FILE" ]; then
+            local jwt_perms=$(stat -c %a "$JWT_FILE")
+            if [ "$jwt_perms" != "$JWT_PERMISSIONS" ]; then
+                log_validation_error "JWT file has incorrect permissions: $jwt_perms (should be $JWT_PERMISSIONS)"
+            fi
+        fi
+        
+        # Validate rate limiting
+        if ! [[ "$AUTH_RATE_LIMIT" =~ ^[0-9]+$ ]]; then
+            log_validation_error "Invalid AUTH_RATE_LIMIT: $AUTH_RATE_LIMIT (must be a number)"
+        fi
+    }
+
+    # Validate monitoring settings
+    validate_monitoring_settings() {
+        if ! [[ "$HEALTH_CHECK_INTERVAL" =~ ^[0-9]+$ ]] || [ "$HEALTH_CHECK_INTERVAL" -lt 10 ]; then
+            log_validation_error "Invalid HEALTH_CHECK_INTERVAL: $HEALTH_CHECK_INTERVAL (must be ≥ 10 seconds)"
+        fi
+        
+        if ! [[ "$METRICS_RETENTION_DAYS" =~ ^[0-9]+$ ]] || [ "$METRICS_RETENTION_DAYS" -lt 1 ]; then
+            log_validation_error "Invalid METRICS_RETENTION_DAYS: $METRICS_RETENTION_DAYS (must be ≥ 1)"
+        }
+    }
+
+    # Validate operation mode settings
+    validate_operation_mode() {
+        case "$NODE_OPERATION_MODE" in
+            "LOCAL_INTENSIVE"|"LOCAL_STANDARD"|"PUBLIC_SECURE"|"PUBLIC_ARCHIVE")
+                ;;
+            *)
+                log_validation_error "Invalid NODE_OPERATION_MODE: $NODE_OPERATION_MODE"
+                ;;
+        esac
+    }
+
+    # Run all validations
+    validate_memory_settings
+    validate_network_settings
+    validate_security_settings
+    validate_monitoring_settings
+    validate_operation_mode
+
+    # Return validation status
+    if [ $validation_errors -gt 0 ]; then
+        echo -e "${RED}Configuration validation failed with $validation_errors error(s)${NC}" >&2
+        return 1
+    fi
+    echo -e "${GREEN}Configuration validation passed successfully${NC}"
     return 0
 }
 
-# Get a value from the configuration file
-get_config_value() {
-    local config_file="$1"
-    local json_path="$2"
-    local default_value="$3"
-    
-    if [ ! -f "$config_file" ] || ! check_jq_installed; then
-        echo "$default_value"
-        return
-    fi
-    
-    local value=$(jq -r "$json_path" "$config_file" 2>/dev/null)
-    
-    if [ -z "$value" ] || [ "$value" = "null" ]; then
-        echo "$default_value"
-    else
-        echo "$value"
-    fi
-}
+# Run configuration validation
+if ! validate_config; then
+    echo "Please fix configuration errors before continuing."
+    exit 1
+fi
 
 # Load configuration from file
 load_config() {
@@ -285,7 +629,6 @@ load_config() {
     PRYSM_IMAGE=$(get_config_value "$config_file" '.clients.consensus.image' "$PRYSM_IMAGE")
     
     # Load advanced client configuration
-    EXECUTION_CACHE_SIZE=$(get_config_value "$config_file" '.clients.execution.cache_size' "$EXECUTION_CACHE_SIZE")
     EXECUTION_MAX_PEERS=$(get_config_value "$config_file" '.clients.execution.max_peers' "$EXECUTION_MAX_PEERS")
     EXECUTION_API_ENABLED=$(get_config_value "$config_file" '.clients.execution.api_enabled' "$EXECUTION_API_ENABLED")
     EXECUTION_API_METHODS=$(get_config_value "$config_file" '.clients.execution.api_methods' "$EXECUTION_API_METHODS")
@@ -617,6 +960,83 @@ show_config() {
     echo ""
 }
 
+# Display local machine connection settings
+show_local_connection_settings() {
+    echo "========================================================="
+    echo "     Local Machine Connection Settings"
+    echo "========================================================="
+    echo
+    echo "Network Type: ${NETWORK} (${NETWORK_TYPE:-pulsechain})"
+    echo
+    echo "RPC Endpoints:"
+    echo "-------------"
+    echo "HTTP RPC URL : http://${API_ADDR}:${API_PORT}"
+    echo "WebSocket URL: ws://${API_ADDR}:${API_WS_PORT}"
+    echo
+    echo "Available API Methods:"
+    echo "-------------------"
+    echo "${RPC_ALLOWED_METHODS}" | tr ',' '\n' | while read -r method; do
+        echo "  - ${method}"
+    done
+    echo
+    echo "Access Settings:"
+    echo "---------------"
+    if [[ "$NODE_OPERATION_MODE" == "LOCAL_INTENSIVE" ]]; then
+        echo "Mode          : LOCAL_INTENSIVE (Unrestricted local access)"
+        echo "Rate Limiting : Disabled"
+        echo "Authentication: Disabled"
+    else
+        echo "Mode          : ${NODE_OPERATION_MODE}"
+        echo "Rate Limiting : ${AUTH_RATE_LIMIT} requests/minute"
+        echo "Authentication: ${AUTH_ENABLED}"
+    fi
+    echo
+    echo "Local Network Access:"
+    echo "-------------------"
+    if [[ "$ALLOW_LOCAL_NETWORK" == "true" ]]; then
+        echo "Status        : Enabled"
+        echo "Network Range : ${LOCAL_NETWORK_RANGE}"
+        if [[ -n "$LOCAL_MACHINE_IPS" ]]; then
+            echo "Allowed IPs   : ${LOCAL_MACHINE_IPS}"
+        else
+            echo "Allowed IPs   : All IPs in network range"
+        fi
+    else
+        echo "Status        : Disabled (localhost only)"
+    fi
+    echo
+    echo "Connection Example Commands:"
+    echo "-------------------------"
+    echo "1. Check connection (using curl):"
+    echo "   curl -X POST -H \"Content-Type: application/json\" \\"
+    echo "        --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \\"
+    echo "        http://${API_ADDR}:${API_PORT}"
+    echo
+    echo "2. Web3.js connection:"
+    echo "   const Web3 = require('web3');"
+    echo "   const web3 = new Web3('http://${API_ADDR}:${API_PORT}');"
+    echo
+    echo "3. Ethers.js connection:"
+    echo "   const provider = new ethers.JsonRpcProvider('http://${API_ADDR}:${API_PORT}');"
+    echo
+    echo "4. WebSocket connection:"
+    echo "   const web3 = new Web3('ws://${API_ADDR}:${API_WS_PORT}');"
+    echo
+    echo "Performance Settings:"
+    echo "-------------------"
+    echo "Max Connections : ${RPC_MAX_CONNECTIONS_LOCAL} (HTTP), ${WS_MAX_CONNECTIONS_LOCAL} (WebSocket)"
+    echo "Cache Size      : ${CACHE_SIZE_GB}GB"
+    echo "Indexing Mode   : ${INDEXING_MODE}"
+    echo
+    echo "Mempool Monitoring:"
+    echo "------------------"
+    echo "Mode           : ${MEMPOOL_MONITORING}"
+    echo "Max Slots      : ${MEMPOOL_MAX_SLOTS}"
+    echo "Metrics Interval: ${MEMPOOL_METRICS_INTERVAL} seconds"
+    echo
+    echo "========================================================="
+}
+
 # Add configuration validation function
 validate_configuration() {
     local config_file="/blockchain/node_config.json"
@@ -757,27 +1177,33 @@ fix_configuration() {
     echo "A backup of the original configuration has been saved to ${config_file}.backup"
 }
 
-# Add validation to the main configuration menu
+# Update show_config_menu to include the new option
 show_config_menu() {
     while true; do
         clear
         echo -e "${GREEN}Node Configuration Menu${NC}"
         echo "======================="
         echo "1. Show current configuration"
-        echo "2. Validate configuration"
-        echo "3. Fix configuration issues"
-        echo "4. Edit configuration"
-        echo "5. Save configuration"
-        echo "6. Create default configuration"
-        echo "7. Back to main menu"
+        echo "2. Show local machine connection settings"
+        echo "3. Validate configuration"
+        echo "4. Fix configuration issues"
+        echo "5. Edit configuration"
+        echo "6. Save configuration"
+        echo "7. Create default configuration"
+        echo "8. Back to main menu"
         echo
-        read -p "Please select an option (1-7): " choice
+        read -p "Please select an option (1-8): " choice
         
         case $choice in
             1)
-                show_current_config
+                show_config
+                read -p "Press Enter to continue..."
                 ;;
             2)
+                show_local_connection_settings
+                read -p "Press Enter to continue..."
+                ;;
+            3)
                 if validate_configuration; then
                     echo -e "${GREEN}Configuration is valid${NC}"
                 else
@@ -785,23 +1211,23 @@ show_config_menu() {
                 fi
                 read -p "Press Enter to continue..."
                 ;;
-            3)
+            4)
                 if ! validate_configuration; then
                     echo -e "${YELLOW}Attempting to fix configuration issues...${NC}"
                     fix_configuration
                 fi
                 read -p "Press Enter to continue..."
                 ;;
-            4)
+            5)
                 edit_config
                 ;;
-            5)
+            6)
                 save_config
                 ;;
-            6)
+            7)
                 create_default_config
                 ;;
-            7)
+            8)
                 return 0
                 ;;
             *)
@@ -849,4 +1275,9 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 else
     # When sourced, just initialize the configuration
     initialize_config
-fi 
+fi
+
+# Call configuration functions
+calculate_resources
+configure_operation_mode
+[ "$(id -u)" = "0" ] && tune_system_for_intensive_local 

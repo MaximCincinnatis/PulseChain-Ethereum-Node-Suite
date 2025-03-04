@@ -17,7 +17,8 @@ function cleanup() {
             ${script_path}
         else
             echo "Error: ${script_path} not found or not executable."
-            exit 1
+            read -p "Press Enter to continue..."
+            return 1
         fi
     }
 # Get the CUSTOM_PATH from environment or use default

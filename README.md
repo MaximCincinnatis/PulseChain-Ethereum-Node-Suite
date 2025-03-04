@@ -21,14 +21,101 @@ The setup script will guide you through the installation process:
 2. Choose your installation method (Docker Compose or Traditional)
 3. Select your preferred network (PulseChain or Ethereum)
 4. Configure your node settings
+5. Select your operation mode
 
 ## System Requirements
 
 - CPU: 4+ cores (8+ recommended)
 - RAM: 16GB minimum (32GB recommended)
-- Storage: 2TB+ SSD/NVMe
+- Storage: 2TB+ SSD/NVMe (4TB+ for archive nodes)
 - Internet: 25+ Mbps connection
 - Operating System: Ubuntu 20.04+ / Debian 11+ / Windows 10/11 with WSL2
+
+## Operation Modes
+
+The node supports four operation modes that can be selected during setup or changed later:
+
+### LOCAL_INTENSIVE
+- Optimized for unrestricted local access
+- Maximum performance for indexing and RPC operations
+- No rate limiting or authentication
+- Suitable for development and local indexing
+- Uses up to 70% of system memory for caching
+- Unlimited API method access
+- Automatic system tuning for maximum performance
+
+### LOCAL_STANDARD
+- Balanced local access with basic restrictions
+- Standard performance settings
+- Basic rate limiting (1000 requests/minute)
+- Limited API methods
+- Uses 50% of system memory for caching
+- Suitable for general local use
+
+### PUBLIC_SECURE
+- Enhanced security for public access
+- Rate limiting (100 requests/minute)
+- Authentication enabled
+- Restricted API methods
+- Uses 40% of system memory for caching
+- Suitable for production RPC endpoints
+
+### PUBLIC_ARCHIVE
+- Optimized for archive node operation
+- Strict rate limiting (50 requests/minute)
+- Full historical data access
+- Uses 60% of system memory for caching
+- Suitable for public archive services
+
+## Local Machine Access
+
+The node includes comprehensive local machine connection settings:
+
+### Connection Endpoints
+- HTTP RPC: http://[API_ADDR]:8545
+- WebSocket: ws://[API_ADDR]:8546
+- Configurable API methods
+- Cross-machine access support
+
+### Access Controls
+- Network range restrictions
+- IP whitelisting
+- Rate limiting configuration
+- Authentication options
+
+### Performance Settings
+- Configurable connection limits
+- Cache size optimization
+- Indexing options
+- Mempool monitoring
+
+View your local connection settings anytime:
+```bash
+./setup.sh config
+# Select option 2: Show local machine connection settings
+```
+
+## Enhanced Features
+
+### Backup System
+- Encrypted backup support with OpenSSL
+- Configurable retention policies
+- Backup verification and integrity checks
+- Remote backup capabilities
+- Space management and cleanup
+
+### Configuration Management
+- Centralized JSON-based configuration
+- User-friendly configuration menu
+- Dynamic resource allocation
+- Operation mode switching
+- Health monitoring and alerts
+
+### Mempool Monitoring
+- Detailed transaction tracking
+- Gas price analysis
+- Custom metrics collection
+- Alert system for anomalies
 
 ## Installation Methods
 
@@ -75,23 +162,36 @@ Access your node's dashboard at http://localhost:3000 after installation.
 - Monitor system resources
 - Check client health
 - View network statistics
+- Track mempool metrics
+- Monitor backup status
 
 ## Configuration
 
-The setup process will create a `.env` file with your selected options. You can modify these settings at any time:
+The setup process creates a comprehensive configuration file that can be managed through the configuration menu:
+```bash
+./setup.sh config
+```
+
+Available configuration options:
 - Network selection
+- Operation mode
 - Client choices
 - Port configurations
 - Resource limits
 - Monitoring options
+- Backup settings
+- Access controls
+- Performance tuning
 
 ## Troubleshooting
 
 If you encounter issues:
 1. Check the logs: `docker-compose logs -f` (Docker) or `journalctl -u nodename` (Traditional)
 2. Verify system requirements
-3. Ensure ports are open (8545, 5052, 3000)
+3. Ensure ports are open (8545, 8546, 5052, 3000)
 4. Check disk space and permissions
+5. Review operation mode settings
+6. Validate configuration file
 
 ## Support
 
@@ -111,7 +211,7 @@ For security concerns, please see `SECURITY.md`.
 
 This project is licensed under the MIT License - see the `LICENSE` file for details.
 
-## ⚠️ ALPHA RELEASE WARNING (v0.1.1) ⚠️
+## ⚠️ ALPHA RELEASE WARNING (v0.1.2) ⚠️
 
 **This is an ALPHA release intended for testing and development purposes only.**
 
@@ -151,8 +251,9 @@ This package has been specifically modified to **remove all validator functional
 The Node Suite follows a modular design with these key components:
 
 1. **Main Setup Scripts**: 
-   - `setup_pulse_node.sh` for PulseChain setup
-   - `setup_eth_node.sh` for Ethereum setup
+   - `setup.sh` - Unified setup script that handles both networks
+   - `setup_traditional.sh` - Traditional installation handler
+   - `start-with-docker-compose.sh` - Docker Compose installation handler
 2. **Helper Scripts**: Various scripts in the `helper/` directory provide specialized functionality
 3. **Centralized Configuration**: JSON-based config system for easy management
 4. **Menu Interface**: User-friendly management UI with network-specific options
@@ -462,7 +563,7 @@ For additional troubleshooting assistance, check the `plsmenu` > Info & Manageme
 
 ## 📝 Release Notes
 
-This alpha release (v0.1.1) represents the initial development version with:
+This alpha release (v0.1.2) represents the initial development version with:
 * Core node functionality
 * Monitoring capabilities
 * Management tools
@@ -533,16 +634,22 @@ The setup uses two main configuration files:
 Docker Compose setup uses the following directory structure:
 ```
 PulseChain-Ethereum-Node-Suite/
-├── chaindata/              # Execution client data
-│   ├── pulsechain/
-│   └── ethereum/
-├── beacondata/            # Consensus client data
-│   ├── pulsechain/
-│   └── ethereum/
-├── monitoring/            # Monitoring data
-│   ├── prometheus/
-│   └── grafana/
-└── config/               # Client configurations
+├── data/                  # Main data directory
+│   ├── execution/        # Execution client data
+│   ├── consensus/        # Consensus client data
+│   └── monitoring/       # Monitoring data
+│       ├── prometheus/
+│       └── grafana/
+├── config/               # Client configurations
+├── helper/              # Helper scripts
+│   ├── updates/        # Update management
+│   └── troubleshoot.sh # Troubleshooting tools
+├── docs/                # Documentation
+├── setup.sh            # Main setup script
+├── setup_traditional.sh # Traditional installation
+├── start-with-docker-compose.sh # Docker installation
+├── docker-compose.yml  # Docker services config
+└── .env.example       # Environment template
 ```
 
 ### Monitoring

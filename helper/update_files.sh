@@ -1,124 +1,166 @@
 #!/bin/bash
 
-# Function to check if a URL is reachable
-check_url_accessibility() {
-  local url=$1
-  local return_code=$(curl -s -o /dev/null -w "%{http_code}" $url)
-  if [[ $return_code -eq 200 || $return_code -eq 301 || $return_code -eq 302 ]]; then
-    return 0
-  else
+# Source configuration
+source /blockchain/config.sh
+
+# Function to check for updates
+check_for_updates() {
+    # Define the repository URL (only use Maxim's repository)
+    REPO_URL="https://raw.githubusercontent.com/MaximCincinnatus/install_pulse_node/main"
+    
+    # Get current version
+    CURRENT_VERSION=$(cat "$INSTALL_PATH/version.txt" 2>/dev/null || echo "unknown")
+    
+    # Get latest version
+    LATEST_VERSION=$(curl -s "$REPO_URL/version.txt")
+    
+    # Compare versions
+    if [ "$CURRENT_VERSION" != "$LATEST_VERSION" ] && [ -n "$LATEST_VERSION" ]; then
+        # Get changelog
+        CHANGELOG=$(curl -s "$REPO_URL/CHANGELOG.md" | head -n 10)
+        
+        # Store update information
+        mkdir -p "$INSTALL_PATH/updates"
+        cat > "$INSTALL_PATH/updates/available_update.json" << EOF
+{
+    "current_version": "$CURRENT_VERSION",
+    "latest_version": "$LATEST_VERSION",
+    "changelog": "$CHANGELOG",
+    "check_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+}
+EOF
+        return 0
+    fi
     return 1
-  fi
 }
 
-# Display pre-release warning
-echo "=========================================================="
-echo "⚠️  PRE-PRE-RELEASE WARNING ⚠️"
-echo "This is a pre-alpha release of PulseChain Full Node Suite"
-echo "It may contain bugs and incomplete features"
-echo "Use at your own risk in non-production environments only"
-echo "=========================================================="
-echo ""
-echo "Press Enter to continue or Ctrl+C to cancel"
-read -p ""
-
-# Define the primary and fallback URLs for the repository
-PRIMARY_URL="https://raw.githubusercontent.com/tdslaine/install_pulse_node/main"
-FALLBACK_URL="https://raw.githubusercontent.com/MaximCincinnatus/install_pulse_node/main"
-
-# Determine install path - default to /blockchain if not set
-if [ -z "$INSTALL_PATH" ]; then
-  # Try to detect it
-  if [ -d "/blockchain" ]; then
-    INSTALL_PATH="/blockchain"
-  else
-    echo "Error: Installation path could not be determined. Please set the INSTALL_PATH variable."
-    exit 1
-  fi
-fi
-
-# Get temporary directory
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
-
-# Create the helper directory if it doesn't exist
-mkdir -p $INSTALL_PATH/helper
-
-# Check if the primary URL is reachable, if not, use the fallback URL
-if check_url_accessibility "$PRIMARY_URL/setup_pulse_node.sh"; then
-  REPO_URL=$PRIMARY_URL
-else
-  echo "Primary URL not accessible, using fallback URL."
-  REPO_URL=$FALLBACK_URL
-fi
-
-echo "Getting updated files from $REPO_URL"
-
-# Download the main script files
-wget -q $REPO_URL/setup_pulse_node.sh -O $TMP_DIR/setup_pulse_node.sh
-wget -q $REPO_URL/setup_monitoring.sh -O $TMP_DIR/setup_monitoring.sh
-wget -q $REPO_URL/functions.sh -O $TMP_DIR/functions.sh
-
-# Verify the directory exists or create it
-[ -d "$INSTALL_PATH/helper" ] || mkdir -p "$INSTALL_PATH/helper"
-
-# Copy updated script files
-cp $TMP_DIR/setup_pulse_node.sh $INSTALL_PATH/
-cp $TMP_DIR/setup_monitoring.sh $INSTALL_PATH/
-cp $TMP_DIR/functions.sh $INSTALL_PATH/
-
-# Download helper scripts
-wget -q $REPO_URL/helper/menu.sh -O $TMP_DIR/menu.sh
-wget -q $REPO_URL/helper/update_files.sh -O $TMP_DIR/update_files.sh
-wget -q $REPO_URL/helper/verify_node.sh -O $TMP_DIR/verify_node.sh
-wget -q $REPO_URL/helper/check_sync.sh -O $TMP_DIR/check_sync.sh
-wget -q $REPO_URL/helper/check_rpc_connection.sh -O $TMP_DIR/check_rpc_connection.sh
-wget -q $REPO_URL/helper/backup_restore.sh -O $TMP_DIR/backup_restore.sh
-wget -q $REPO_URL/helper/stop_docker.sh -O $TMP_DIR/stop_docker.sh
-wget -q $REPO_URL/helper/grace.sh -O $TMP_DIR/grace.sh
-
-# Copy helper scripts (excluding validator-related scripts)
-cp $TMP_DIR/menu.sh $INSTALL_PATH/helper/
-cp $TMP_DIR/update_files.sh $INSTALL_PATH/helper/
-cp $TMP_DIR/verify_node.sh $INSTALL_PATH/helper/
-cp $TMP_DIR/check_sync.sh $INSTALL_PATH/helper/
-cp $TMP_DIR/check_rpc_connection.sh $INSTALL_PATH/helper/
-cp $TMP_DIR/backup_restore.sh $INSTALL_PATH/helper/
-cp $TMP_DIR/stop_docker.sh $INSTALL_PATH/helper/
-cp $TMP_DIR/grace.sh $INSTALL_PATH/helper/
-
-# Set executable permissions
-chmod +x $INSTALL_PATH/*.sh
-chmod +x $INSTALL_PATH/helper/*.sh
-
-# Update start scripts if they exist
-# Non-validator edition only needs execution and consensus client scripts
-SCRIPTS=("$INSTALL_PATH/start_consensus.sh" "$INSTALL_PATH/start_execution.sh")
-for script in "${SCRIPTS[@]}"; do
-  if [ -f "$script" ]; then
-    # Get the existing script to analyze what client it's using
-    if grep -q "lighthouse" "$script"; then
-      CLIENT="lighthouse"
-    elif grep -q "prysm" "$script"; then
-      CLIENT="prysm"
-    elif grep -q "geth" "$script"; then
-      CLIENT="geth"
-    elif grep -q "erigon" "$script"; then
-      CLIENT="erigon"
-    fi
+# Function to perform update
+perform_update() {
+    echo "Starting update process..."
     
-    if [ ! -z "$CLIENT" ]; then
-      echo "Detected $CLIENT in $script, updating..."
-      # Here you would download and apply the appropriate start script
-    fi
-  fi
-done
+    # Create temp directory
+    TMP_DIR=$(mktemp -d)
+    trap 'rm -rf "$TMP_DIR"' EXIT
+    
+    # Download new files
+    echo "Downloading updated files..."
+    wget -q $REPO_URL/setup_pulse_node.sh -O $TMP_DIR/setup_pulse_node.sh
+    wget -q $REPO_URL/setup_monitoring.sh -O $TMP_DIR/setup_monitoring.sh
+    wget -q $REPO_URL/functions.sh -O $TMP_DIR/functions.sh
+    
+    # Backup current files
+    echo "Creating backup of current files..."
+    BACKUP_DIR="$INSTALL_PATH/backups/$(date +%Y%m%d_%H%M%S)"
+    mkdir -p "$BACKUP_DIR"
+    cp "$INSTALL_PATH"/*.sh "$BACKUP_DIR/"
+    cp -r "$INSTALL_PATH/helper" "$BACKUP_DIR/"
+    
+    # Copy new files
+    echo "Installing updates..."
+    cp $TMP_DIR/setup_pulse_node.sh $INSTALL_PATH/
+    cp $TMP_DIR/setup_monitoring.sh $INSTALL_PATH/
+    cp $TMP_DIR/functions.sh $INSTALL_PATH/
+    
+    # Update helper scripts
+    mkdir -p "$INSTALL_PATH/helper"
+    for script in menu.sh verify_node.sh check_sync.sh backup_restore.sh stop_docker.sh grace.sh; do
+        wget -q "$REPO_URL/helper/$script" -O "$TMP_DIR/$script"
+        cp "$TMP_DIR/$script" "$INSTALL_PATH/helper/"
+    done
+    
+    # Set permissions
+    chmod +x $INSTALL_PATH/*.sh
+    chmod +x $INSTALL_PATH/helper/*.sh
+    
+    # Update version file
+    echo "$LATEST_VERSION" > "$INSTALL_PATH/version.txt"
+    
+    # Remove update notification
+    rm -f "$INSTALL_PATH/updates/available_update.json"
+    
+    echo "Update completed successfully!"
+    echo "Backup of previous version stored in: $BACKUP_DIR"
+}
 
-# Check if script update is already in cron
-if ! crontab -l | grep -q "update_files.sh"; then
-  # Add daily check for updates to crontab
-  (crontab -l 2>/dev/null; echo "0 3 * * * $INSTALL_PATH/helper/update_files.sh > /dev/null 2>&1") | crontab -
-  echo "Added daily update check to crontab"
+# Main menu
+show_update_menu() {
+    while true; do
+        clear
+        echo "=== PulseChain Node Update Manager ==="
+        echo ""
+        
+        # Check for stored update information
+        if [ -f "$INSTALL_PATH/updates/available_update.json" ]; then
+            echo "📦 Update Available!"
+            echo "-------------------"
+            CURRENT_VERSION=$(jq -r .current_version "$INSTALL_PATH/updates/available_update.json")
+            LATEST_VERSION=$(jq -r .latest_version "$INSTALL_PATH/updates/available_update.json")
+            echo "Current version: $CURRENT_VERSION"
+            echo "Latest version:  $LATEST_VERSION"
+            echo ""
+            echo "Recent changes:"
+            jq -r .changelog "$INSTALL_PATH/updates/available_update.json" | sed 's/^/  /'
+            echo ""
+        else
+            echo "✓ Your node software is up to date"
+            echo ""
+        fi
+        
+        echo "Options:"
+        echo "1. Check for updates"
+        echo "2. Install available update"
+        echo "3. View update history"
+        echo "4. Return to main menu"
+        echo ""
+        read -p "Select an option: " choice
+        
+        case $choice in
+            1)
+                echo "Checking for updates..."
+                if check_for_updates; then
+                    echo "Updates are available!"
+                else
+                    echo "No updates available."
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            2)
+                if [ -f "$INSTALL_PATH/updates/available_update.json" ]; then
+                    echo ""
+                    echo "⚠️  Warning:"
+                    echo "- A backup will be created automatically"
+                    echo "- Your current configuration will be preserved"
+                    echo "- You can rollback using the backup if needed"
+                    echo ""
+                    read -p "Do you want to proceed with the update? (y/N): " confirm
+                    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+                        perform_update
+                    fi
+                else
+                    echo "No updates available to install."
+                fi
+                read -p "Press Enter to continue..."
+                ;;
+            3)
+                clear
+                echo "=== Update History ==="
+                echo ""
+                if [ -d "$INSTALL_PATH/backups" ]; then
+                    ls -lh "$INSTALL_PATH/backups"
+                else
+                    echo "No update history available"
+                fi
+                echo ""
+                read -p "Press Enter to continue..."
+                ;;
+            4)
+                return
+                ;;
+        esac
+    done
+}
+
+# If script is run directly, show the menu
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    show_update_menu
 fi
-
-echo "Update completed!"

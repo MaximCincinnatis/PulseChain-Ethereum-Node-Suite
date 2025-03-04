@@ -389,123 +389,128 @@ health_submenu() {
 
 node_info_submenu() {
     while true; do
-        info_opt=$(dialog --stdout --title "Info and Management $VERSION" --backtitle "PulseChain Node Management" --menu "View information about your node:" 0 0 0 \
-                       "Node Configuration" "View current node configuration" \
-                       "Network Information" "View network and peer information" \
-                       "Client Versions" "Check versions of running clients" \
-                       "Blockchain Status" "View blockchain height and sync status" \
-                       "BACK" "Return to the Main Menu")
-
+        options=("Node Configuration" "View current node configuration" \
+                "Network Information" "View network and peer information" \
+                "Client Info" "Prints currently used client version" \
+                "Blockchain Status" "View blockchain height and sync status" \
+                "Mempool Access Info" "View mempool access details and examples" \
+                "-" "" \
+                "GoPLS - BlockMonitor" "Compare local Block# with scan.puslechain.com" \
+                "GoPLS - Database Prunning" "Prune your local DB to freeup space" \
+                "-" "" \
+                "back" "Back to main menu")
+        ni_opt=$(dialog --stdout --title "Info and Management $VERSION" --backtitle "PulseChain Node Setup by Maxim Broadcast" --menu "Choose an option:" 0 0 0 "${options[@]}")
         case $? in
-          0)
-            case $info_opt in
-                "Node Configuration")
-                    show_header "Node Configuration"
-                    echo "Current configuration:"
-                    echo "  • Installation path: $CUSTOM_PATH"
-                    echo "  • Network: $NETWORK"
-                    echo "  • Execution client: $ETH_CLIENT"
-                    echo "  • Consensus client: $CONSENSUS_CLIENT"
-                    
-                    if [ -f "$CUSTOM_PATH/node_config.json" ]; then
-                        echo ""
-                        echo "Configuration file contents:"
-                        cat "$CUSTOM_PATH/node_config.json" | jq
-                    fi
-                    pause
-                    ;;
-                "Network Information")
-                    show_header "Network Information"
-                    echo "Execution client peer information:"
-                    curl -s -X POST -H "Content-Type: application/json" \
-                        --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":1}' \
-                        http://localhost:8545 | jq
-                    
-                    echo ""
-                    echo "Node listening ports:"
-                    sudo netstat -tulpn | grep -E 'docker|geth|erigon|lighthouse|prysm'
-                    pause
-                    ;;
-                "Client Versions")
-                    show_header "Client Versions"
-                    echo "Checking execution client version..."
-                    version=$(curl -s -X POST -H "Content-Type: application/json" \
-                        --data '{"jsonrpc":"2.0","method":"web3_clientVersion","params":[],"id":1}' \
-                        http://localhost:8545 | jq -r '.result')
-                    echo "Execution client version: $version"
-                    
-                    echo ""
-                    echo "Docker images:"
-                    sudo docker images | grep -E 'geth|erigon|lighthouse|prysm'
-                    pause
-                    ;;
-                "Blockchain Status")
-                    show_header "Blockchain Status"
-                    echo "Current blockchain information:"
-                    
-                    # Get current block
-                    current_block=$(curl -s -X POST -H "Content-Type: application/json" \
-                        --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
-                        http://localhost:8545 | grep -oP '(?<="result":")0x[^"]+' | tr -d '0x' | xargs printf "%d" 2>/dev/null)
-                    
-                    if [[ -n "$current_block" ]]; then
-                        echo "Current block height: $current_block"
+            0)
+                case $ni_opt in
+                    "-")
+                        ;;
+                    "Node Configuration")
+                        show_header "Node Configuration"
+                        echo "Current configuration:"
+                        echo "  • Installation path: $CUSTOM_PATH"
+                        echo "  • Network: $NETWORK"
+                        echo "  • Execution client: $ETH_CLIENT"
+                        echo "  • Consensus client: $CONSENSUS_CLIENT"
                         
-                        # Get chain ID
-                        chain_id=$(curl -s -X POST -H "Content-Type: application/json" \
-                            --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+                        if [ -f "$CUSTOM_PATH/node_config.json" ]; then
+                            echo ""
+                            echo "Configuration file contents:"
+                            cat "$CUSTOM_PATH/node_config.json" | jq
+                        fi
+                        pause
+                        ;;
+                    "Network Information")
+                        show_header "Network Information"
+                        echo "Execution client peer information:"
+                        curl -s -X POST -H "Content-Type: application/json" \
+                            --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":1}' \
+                            http://localhost:8545 | jq
+                        
+                        echo ""
+                        echo "Node listening ports:"
+                        sudo netstat -tulpn | grep -E 'docker|geth|erigon|lighthouse|prysm'
+                        pause
+                        ;;
+                    "Client Info")
+                        clear && script_launch "show_version.sh"
+                        ;;
+                    "Blockchain Status")
+                        show_header "Blockchain Status"
+                        echo "Current blockchain information:"
+                        
+                        # Get current block
+                        current_block=$(curl -s -X POST -H "Content-Type: application/json" \
+                            --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
                             http://localhost:8545 | grep -oP '(?<="result":")0x[^"]+' | tr -d '0x' | xargs printf "%d" 2>/dev/null)
                         
-                        if [[ -n "$chain_id" ]]; then
-                            echo "Chain ID: $chain_id"
+                        if [[ -n "$current_block" ]]; then
+                            echo "Current block height: $current_block"
                             
-                            # Resolve chain name
-                            chain_name="Unknown"
-                            if [[ "$chain_id" == "369" ]]; then
-                                chain_name="PulseChain Mainnet"
-                            elif [[ "$chain_id" == "943" ]]; then
-                                chain_name="PulseChain Testnet v4"
+                            # Get chain ID
+                            chain_id=$(curl -s -X POST -H "Content-Type: application/json" \
+                                --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+                                http://localhost:8545 | grep -oP '(?<="result":")0x[^"]+' | tr -d '0x' | xargs printf "%d" 2>/dev/null)
+                            
+                            if [[ -n "$chain_id" ]]; then
+                                echo "Chain ID: $chain_id"
+                                
+                                # Resolve chain name
+                                chain_name="Unknown"
+                                if [[ "$chain_id" == "369" ]]; then
+                                    chain_name="PulseChain Mainnet"
+                                elif [[ "$chain_id" == "943" ]]; then
+                                    chain_name="PulseChain Testnet v4"
+                                fi
+                                echo "Network: $chain_name"
                             fi
-                            echo "Network: $chain_name"
-                        fi
-                        
-                        # Block time of latest block
-                        latest_block_info=$(curl -s -X POST -H "Content-Type: application/json" \
-                            --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"latest\", false],\"id\":1}" \
-                            http://localhost:8545)
-                        
-                        block_time=$(echo "$latest_block_info" | grep -oP '(?<="timestamp":")0x[^"]+' | tr -d '0x' | xargs printf "%d" 2>/dev/null)
-                        
-                        if [[ -n "$block_time" ]]; then
-                            # Convert hex timestamp to date
-                            block_date=$(date -d @$block_time)
-                            echo "Latest block time: $block_date"
                             
-                            # Calculate age
-                            now=$(date +%s)
-                            age=$(($now - $block_time))
+                            # Block time of latest block
+                            latest_block_info=$(curl -s -X POST -H "Content-Type: application/json" \
+                                --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"latest\", false],\"id\":1}" \
+                                http://localhost:8545)
                             
-                            if [[ $age -lt 60 ]]; then
-                                echo "Block age: $age seconds (healthy)"
-                            elif [[ $age -lt 300 ]]; then
-                                echo "Block age: $age seconds (normal)"
-                            else
-                                echo "Block age: $age seconds (potential sync issues)"
+                            block_time=$(echo "$latest_block_info" | grep -oP '(?<="timestamp":")0x[^"]+' | tr -d '0x' | xargs printf "%d" 2>/dev/null)
+                            
+                            if [[ -n "$block_time" ]]; then
+                                # Convert hex timestamp to date
+                                block_date=$(date -d @$block_time)
+                                echo "Latest block time: $block_date"
+                                
+                                # Calculate age
+                                now=$(date +%s)
+                                age=$(($now - $block_time))
+                                
+                                if [[ $age -lt 60 ]]; then
+                                    echo "Block age: $age seconds (healthy)"
+                                elif [[ $age -lt 300 ]]; then
+                                    echo "Block age: $age seconds (normal)"
+                                else
+                                    echo "Block age: $age seconds (potential sync issues)"
+                                fi
                             fi
+                        else
+                            echo "Could not retrieve current block information."
                         fi
-                    else
-                        echo "Could not retrieve current block information."
-                    fi
-                    pause
-                    ;;
-                "BACK")
-                    break
-                    ;;
-            esac
-            ;;
-          1)
-            break
-            ;;
+                        pause
+                        ;;
+                    "Mempool Access Info")
+                        clear && script_launch "mempool_info.sh"
+                        ;;
+                    "GoPLS - BlockMonitor")
+                        clear && script_launch "compare_blocks.sh"
+                        ;;
+                    "GoPLS - Database Prunning")
+                        tmux new-session -s prune $CUSTOM_PATH/helper/gopls_prune.sh
+                        ;;
+                    "back")
+                        break
+                        ;;
+                esac
+                ;;
+            1)
+                break
+                ;;
         esac
     done
 }

@@ -3003,3 +3003,59 @@ function docker_auto_recovery() {
     log_info "Docker recovery successful"
     return 0
 }
+
+# Function to check for updates and show indicator
+check_updates_indicator() {
+    if [ -f "$INSTALL_PATH/updates/available_update.json" ]; then
+        echo "🔔 Updates available"
+        return 0
+    fi
+    return 1
+}
+
+# Main menu function
+show_main_menu() {
+    while true; do
+        clear
+        echo "=== PulseChain Node Management ==="
+        echo ""
+        
+        # Show update indicator if updates are available
+        check_updates_indicator
+        
+        echo "Select an option:"
+        echo "1. Node Control"
+        echo "2. Monitoring"
+        echo "3. Maintenance"
+        if [ -f "$INSTALL_PATH/updates/available_update.json" ]; then
+            echo "4. Updates 🔔"
+        else
+            echo "4. Updates"
+        fi
+        echo "5. Help"
+        echo "6. Exit"
+        echo ""
+        read -p "Enter your choice: " choice
+        
+        case $choice in
+            1)
+                show_node_control_menu
+                ;;
+            2)
+                show_monitoring_menu
+                ;;
+            3)
+                show_maintenance_menu
+                ;;
+            4)
+                $INSTALL_PATH/helper/update_files.sh
+                ;;
+            5)
+                show_help_menu
+                ;;
+            6)
+                exit 0
+                ;;
+        esac
+    done
+}
