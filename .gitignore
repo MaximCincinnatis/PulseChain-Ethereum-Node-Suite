@@ -46,6 +46,7 @@ npm-debug.log*
 *.bak
 *~
 *.backup
+backup_for_git/
 
 # Debug files
 debug/
